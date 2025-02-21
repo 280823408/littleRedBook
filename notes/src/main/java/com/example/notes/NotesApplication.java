@@ -1,12 +1,11 @@
-package com.example.littleredbook;
+package com.example.notes;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class LittleRedBookApplication {
+public class NotesApplication {
     public static void main(String[] args) {
-        SpringApplication.run(LittleRedBookApplication.class, args);
+        SpringApplication.run(NotesApplication.class, args);
     }
-
 }
