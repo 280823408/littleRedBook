@@ -15,34 +15,22 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @TableName("user")
 public class User {
-    /**
-     * 用户id
-     */
+    /** 用户id */
     @TableId(value = "id",type = IdType.AUTO)
     private Integer id;
-    /**
-     * 用户名
-     */
+    /** 用户名 */
     @TableField("user_name")
     private String userName;
-    /**
-     * 用户头像图标链接
-     */
+    /** 用户头像图标链接 */
     private String icon;
 
-    /**
-     * 用户个人信息描述
-     */
+    /** 用户个人信息描述 */
     private String info;
 
-    /**
-     * 用户电话号码，非空
-     */
+    /** 用户电话号码，非空 */
     private String phone;
 
-    /**
-     * 用户密码，非空
-     */
+    /** 用户密码，非空 */
     @TableField("user_password")
     private String userPassword;
 }

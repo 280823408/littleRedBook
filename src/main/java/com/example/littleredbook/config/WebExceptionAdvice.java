@@ -4,7 +4,17 @@ import com.example.littleredbook.dto.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
+/**
+ * 全局REST控制器异常处理切面
+ *
+ * <p>功能说明：
+ * 1. 统一处理控制器层抛出的运行时异常<br>
+ * 2. 规范化异常响应格式<br>
+ * 3. 记录异常日志便于问题追踪<br>
+ *
+ * @author Mike
+ * @since 2025/2/23
+ */
 @Slf4j
 @RestControllerAdvice
 public class WebExceptionAdvice {
