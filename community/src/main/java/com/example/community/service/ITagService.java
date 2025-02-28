@@ -41,7 +41,7 @@ public interface ITagService extends IService<Tag> {
      * @param tag 待新增的标签对象
      * @return 新增操作结果的Result对象
      */
-    Result insertTag(Tag tag);
+    Result addTag(Tag tag);
 
     /**
      * 查询指定笔记关联的所有标签
@@ -56,5 +56,5 @@ public interface ITagService extends IService<Tag> {
      * @param noteId 笔记ID
      * @return 关联关系操作结果的Result对象
      */
-    Result insertNoteTag(Integer tagId, Integer noteId);
+    Result addNoteTag(Integer tagId, Integer noteId);
 }

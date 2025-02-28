@@ -59,9 +59,9 @@ public class TagController {
      * @param tag 待新增的标签数据传输对象
      * @return 操作结果的Result对象
      */
-    @PostMapping("insertTag")
-    public Result insertTag(@RequestBody Tag tag) {
-        return tagService.insertTag(tag);
+    @PostMapping("addTag")
+    public Result addTag(@RequestBody Tag tag) {
+        return tagService.addTag(tag);
     }
 
     /**
@@ -70,7 +70,7 @@ public class TagController {
      * @param noteId 笔记唯一标识
      * @return 包含关联标签列表的Result对象
      */
-    @GetMapping("getTagsByNoteId")
+    @PostMapping ("getTagsByNoteId")
     public Result getTagsByNoteId(@RequestParam Integer noteId) {
         return tagService.getTagsByNoteId(noteId);
     }
@@ -82,8 +82,8 @@ public class TagController {
      * @param noteId 笔记ID
      * @return 关联操作结果的Result对象
      */
-    @PostMapping("insertNoteTag")
-    public Result insertNoteTag(@RequestParam Integer tagId, @RequestParam Integer noteId) {
-        return tagService.insertNoteTag(tagId, noteId);
+    @PostMapping("addNoteTag")
+    public Result addNoteTag(@RequestParam Integer tagId, @RequestParam Integer noteId) {
+        return tagService.addNoteTag(tagId, noteId);
     }
 }

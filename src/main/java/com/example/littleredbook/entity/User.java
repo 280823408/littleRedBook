@@ -23,13 +23,10 @@ public class User {
     private String userName;
     /** 用户头像图标链接 */
     private String icon;
-
     /** 用户个人信息描述 */
     private String info;
-
     /** 用户电话号码，非空 */
     private String phone;
-
     /** 用户密码，非空 */
     @TableField("user_password")
     private String userPassword;

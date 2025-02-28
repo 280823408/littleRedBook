@@ -1,14 +1,19 @@
 package com.example.littleredbook.utils;
 
 public class RedisConstants {
-    public static final String LOGIN_CODE_KEY = "login:code:";
+    public static final String LOGIN_CODE_KEY = "littleredbook:login:code:";
     public static final Long LOGIN_CODE_TTL = 2L;
-    public static final String LOGIN_USER_KEY = "login:token:";
+    public static final String LOGIN_USER_KEY = "littleredbook:login:token:";
     public static final Long LOGIN_USER_TTL = 30L;
     public static final Long CACHE_NULL_TTL = 2L;
-    public static final String LOCK_PREFIX = "lock:";
+    public static final String LOCK_PREFIX = "littleredbook:lock:string:";
+    public static final String LOCK_HASH_PREFIX = "littleredbook:lock:hash:";
     public static final String USER_NAME = "user_";
-    public static final String CACHE_TAG_KEY = "cache:tag";
+    public static final String CACHE_TAG_KEY = "littleredbook:cache:tag";
+    public static final String CACHE_NOTE_KEY = "littleredbook:cache:note";
+    public static final Long CACHE_NOTE_TTL = 10L;
+    public static final String CACHE_NOTE_USER_KEY = "littleredbook:cache:note:user";
+    public static final Long CACHE_NOTE_USER_TTL = 10L;
     public static final Long CACHE_TAG_TTL = 60L;
     public static final Long CACHE_SHOP_TTL = 30L;
     public static final String CACHE_SHOP_KEY = "cache:shop:";

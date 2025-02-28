@@ -1,7 +1,11 @@
 package com.example.community.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.Tag;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
  * 标签数据访问层接口
@@ -19,4 +23,11 @@ import com.example.littleredbook.entity.Tag;
  * @since 2025/2/25
  */
 public interface TagMapper extends BaseMapper<Tag> {
+    /**
+     * 根据笔记ID查询关联的标签列表
+     * @param noteId
+     * @return
+     */
+    @Select("SELECT * FROM tag JOIN tag_note ON tag.id = tag_note.tag_id WHERE tag_note.note_id = #{noteId}")
+    List<Tag> selectTagsByNoteId(Integer noteId);
 }

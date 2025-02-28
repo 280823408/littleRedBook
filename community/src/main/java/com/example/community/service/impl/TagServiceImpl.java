@@ -81,7 +81,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
      */
     @Override
     @Transactional
-    public Result insertTag(Tag tag) {
+    public Result addTag(Tag tag) {
         if (!save(tag)) {
             return Result.fail("添加新标签失败！");
         }
@@ -96,9 +96,9 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
      * @return 待实现的Result对象
      */
     @Override
+    @Transactional
     public Result getTagsByNoteId(Integer noteId) {
-        // TODO: 实现笔记关联标签查询逻辑
-        return Result.fail("功能暂未开放！");
+        return Result.ok(baseMapper.selectTagsByNoteId(noteId));
     }
 
     /**
@@ -108,7 +108,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
      * @return 待实现的Result对象
      */
     @Override
-    public Result insertNoteTag(Integer tagId, Integer noteId) {
+    public Result addNoteTag(Integer tagId, Integer noteId) {
         // TODO: 实现标签与笔记关联关系存储
         return Result.fail("功能暂未开放！");
     }

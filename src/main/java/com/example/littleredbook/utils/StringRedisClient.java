@@ -8,8 +8,10 @@ import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.DigestUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -235,7 +237,7 @@ public class StringRedisClient {
     public <R, ID> R queryWithPassThrough(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
-        String json = stringRedisTemplate.opsForValue().get(key);
+        String json = this.get(key);
         if (StrUtil.isNotBlank(json)) {
             return JSONUtil.toBean(json, type);
         }
@@ -244,7 +246,7 @@ public class StringRedisClient {
         }
         R result = dbFallback.apply(id);
         if (result == null) {
-            stringRedisTemplate.opsForValue().set(key, "", RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
+            this.set(key, "", RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
             return null;
         }
         this.set(key, result, time, unit);
@@ -266,7 +268,7 @@ public class StringRedisClient {
     public <R, ID> R queryWithLogicalExpire(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
-        String json = stringRedisTemplate.opsForValue().get(key);
+        String json = this.get(key);
         if (StrUtil.isBlank(json)) {
             return null;
         }
@@ -310,7 +312,7 @@ public class StringRedisClient {
     public <R, ID> R queryWithMutex(
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
-        String json = stringRedisTemplate.opsForValue().get(key);
+        String json = this.get(key);
         if (StrUtil.isNotBlank(json)) {
             return JSONUtil.toBean(json, type);
         }
@@ -326,11 +328,61 @@ public class StringRedisClient {
                 Thread.sleep(50);
                 return queryWithMutex(keyPrefix, id, type, dbFallback, time, unit);
             }
-
             result = dbFallback.apply(id);
             if (result == null) {
-                stringRedisTemplate.opsForValue().set(key, "", RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
+                this.set(key, "", RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
                 return null;
+            }
+            this.set(key, result, time, unit);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
+        }
+        return result;
+    }
+
+    /**
+     * 互斥锁缓存查询（列表版本）：缓存未命中时使用分布式锁保证单线程查询数据库并写入缓存
+     * @param keyPrefix 缓存键前缀
+     * @param id 业务ID
+     * @param type 列表元素类型
+     * @param dbFallback 数据库批量查询函数
+     * @param time 缓存时间数值
+     * @param unit 时间单位
+     * @param <R> 返回列表元素类型泛型
+     * @param <ID> ID类型泛型
+     * @return 查询结果列表，不存在时返回空列表
+     */
+    public <R, ID> List<R> queryListWithMutex(String keyPrefix, ID id, Class<R> type, Function<ID, List<R>> dbFallback, Long time, TimeUnit unit) {
+        String key = keyPrefix + id;
+        String json = this.get(key);
+        if (StrUtil.isNotBlank(json)) {
+            return JSONUtil.toList(json, type);
+        }
+        if (json != null) {
+            return Collections.emptyList();
+        }
+        String lockKey = RedisConstants.LOCK_PREFIX + key;
+        RLock lock = redissonClient.getLock(lockKey);
+        List<R> result;
+        try {
+            boolean isLock = lock.tryLock(100, 10, TimeUnit.SECONDS);
+            if (!isLock) {
+                Thread.sleep(50);
+                return this.queryListWithMutex(keyPrefix, id, type, dbFallback, time, unit);
+            }
+            json = stringRedisTemplate.opsForValue().get(key);
+            if (StrUtil.isNotBlank(json)) {
+                return JSONUtil.toList(json, type);
+            }
+            if (json != null) {
+                return Collections.emptyList();
+            }
+            result = dbFallback.apply(id);
+            if (result == null || result.isEmpty()) {
+                this.set(key, "[]", RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
+                return Collections.emptyList();
             }
             this.set(key, result, time, unit);
         } catch (InterruptedException e) {
