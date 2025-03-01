@@ -7,4 +7,9 @@ public class TagClientFallback implements TagClient {
     public Result getTagsByNoteId(Integer noteId) {
         return Result.fail("标签服务不可用");
     }
+
+    @Override
+    public Result getNoteIdByTagId(Integer tagId) {
+        return Result.fail("标签服务不可用");
+    }
 }

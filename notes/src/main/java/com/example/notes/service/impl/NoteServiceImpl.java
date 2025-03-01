@@ -19,11 +19,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static com.example.littleredbook.utils.RedisConstants.*;
 
@@ -53,6 +53,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         }
         return Result.ok(noteDTO);
     }
+
 
 //    /**
 //     * 根据笔记ID查询笔记(通过JSON字符串存储版本)
@@ -86,7 +87,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
                 CACHE_NOTE_USER_KEY,
                 userId,
                 NoteDTO.class,
-                this::getNoteDTOsFromDB,
+                this::getNoteDTOsFromDBForUserId,
                 CACHE_NOTE_USER_TTL,
                 TimeUnit.MINUTES
         );
@@ -95,6 +96,139 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         }
         return Result.ok(noteDTOS);
     }
+
+    /**
+     * 根据标题查询笔记
+     * @param title
+     * @return
+     */
+    @Override
+    @Transactional
+    public Result getNotesByTitle(String title) {
+        List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id").like("title", title), obj -> (Integer) obj);
+        List<NoteDTO> noteDTOS = new ArrayList<>();
+        if (noteIds.isEmpty()) {
+            return Result.fail("没有找到相关笔记!");
+        }
+        noteIds.forEach(id -> {
+            try {
+                noteDTOS.add(hashRedisClient.queryWithMutex(
+                        CACHE_NOTE_KEY,
+                        id,
+                        NoteDTO.class,
+                        this::getNoteDTOFromDB,
+                        CACHE_NOTE_TTL,
+                        TimeUnit.MINUTES
+                ));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        return Result.ok(noteDTOS);
+    }
+
+    @Override
+    @Transactional
+    public Result getAllNotesSortedByLikeNum(Integer userId) {
+        List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id"), obj -> (Integer) obj);
+        List<NoteDTO> noteDTOS = new ArrayList<>();
+        if (noteIds.isEmpty()) {
+            return Result.fail("没有找到相关笔记!");
+        }
+        noteIds.forEach(id -> {
+            try {
+                noteDTOS.add(hashRedisClient.queryWithMutex(
+                        CACHE_NOTE_KEY,
+                        id,
+                        NoteDTO.class,
+                        this::getNoteDTOFromDB,
+                        CACHE_NOTE_TTL,
+                        TimeUnit.MINUTES
+                ));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        noteDTOS.sort((o1, o2) -> (int) (o2.getLikeNum() - o1.getLikeNum()));
+        return Result.ok(noteDTOS);
+    }
+
+    @Override
+    @Transactional
+    public Result getAllNotesSortedByCreatTime(Integer userId) {
+        List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id"), obj -> (Integer) obj);
+        List<NoteDTO> noteDTOS = new ArrayList<>();
+        if (noteIds.isEmpty()) {
+            return Result.fail("没有找到相关笔记!");
+        }
+        noteIds.forEach(id -> {
+            try {
+                noteDTOS.add(hashRedisClient.queryWithMutex(
+                        CACHE_NOTE_KEY,
+                        id,
+                        NoteDTO.class,
+                        this::getNoteDTOFromDB,
+                        CACHE_NOTE_TTL,
+                        TimeUnit.MINUTES
+                ));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        noteDTOS.sort((o1, o2) -> o2.getCreateTime().compareTo(o1.getCreateTime()));
+        return Result.ok(noteDTOS);
+    }
+
+    @Override
+    @Transactional
+    public Result getNotesByTag(Integer tagId) {
+        Object tagData = tagClient.getNoteIdByTagId(tagId).getData();
+        List<Integer> noteIds = BeanUtil.copyToList((List<?>) tagData, Integer.class);
+        List<NoteDTO> noteDTOS = new ArrayList<>();
+        if (noteIds.isEmpty()) {
+            return Result.fail("没有找到相关笔记!");
+        }
+        noteIds.forEach(id -> {
+            try {
+                noteDTOS.add(hashRedisClient.queryWithMutex(
+                        CACHE_NOTE_KEY,
+                        id,
+                        NoteDTO.class,
+                        this::getNoteDTOFromDB,
+                        CACHE_NOTE_TTL,
+                        TimeUnit.MINUTES
+                ));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        noteDTOS.sort((o1, o2) -> (int) (o2.getLikeNum() - o1.getLikeNum()));
+        return Result.ok(noteDTOS);
+    }
+
+    @Override
+    @Transactional
+    public Result addNote(Note note) {
+        Integer id = note.getId();
+        if (id == null) {
+            return Result.fail("笔记ID不能为空!");
+        }
+        updateById(note);
+        hashRedisClient.delete(CACHE_NOTE_KEY + id);
+        return Result.ok();
+    }
+
+    @Override
+    public Result updateNote(Note note) {
+        Integer id = note.getId();
+        if (id == null) {
+            return Result.fail("笔记ID不能为空!");
+        }
+        save(note);
+        hashRedisClient.delete(CACHE_NOTE_KEY + id);
+        return Result.ok();
+    }
+
     /**
      * 数据库回源函数：查询数据库并组装 NoteDTO
      */
@@ -120,10 +254,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteDTO.setTags(tags);
         return noteDTO;
     }
+
     /**
-     * 数据库回源函数：查询数据库并组装 NoteDTOs
+     * 数据库回源函数：查询数据库userId并组装 NoteDTOs
      */
-    private List<NoteDTO> getNoteDTOsFromDB(Integer userId) {
+    private List<NoteDTO> getNoteDTOsFromDBForUserId(Integer userId) {
         List<Note> notes = list(new QueryWrapper<Note>().eq("user_id", userId));
         if (notes.isEmpty()) {
             return Collections.emptyList();
@@ -136,6 +271,14 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         }
         List<NoteDTO> noteDTOs = BeanUtil.copyToList(notes, NoteDTO.class);
         noteDTOs.forEach(noteDTO -> noteDTO.setUser(user));
+        noteDTOs.forEach(noteDTO -> {
+          Object tagData = tagClient.getTagsByNoteId(noteDTO.getId()).getData();
+          List<Tag> tags = BeanUtil.copyToList((List<?>) tagData, Tag.class);
+          if (tags == null) {
+              log.error("标签服务调用失败: noteId={" + noteDTO.getId() + "}");
+          }
+          noteDTO.setTags(tags);
+        });
         return noteDTOs;
     }
 }

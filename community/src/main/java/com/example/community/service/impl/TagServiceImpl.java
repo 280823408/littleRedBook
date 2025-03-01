@@ -85,7 +85,6 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
         if (!save(tag)) {
             return Result.fail("添加新标签失败！");
         }
-        // 手动触发缓存失效（可优化为监听器模式）
         stringRedisClient.delete(CACHE_TAG_KEY);
         return Result.ok();
     }
@@ -99,6 +98,11 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
     @Transactional
     public Result getTagsByNoteId(Integer noteId) {
         return Result.ok(baseMapper.selectTagsByNoteId(noteId));
+    }
+
+    @Override
+    public Result getNoteIdByTagId(Integer tagId) {
+        return Result.ok(baseMapper.selectNoteIdByTagId(tagId));
     }
 
     /**

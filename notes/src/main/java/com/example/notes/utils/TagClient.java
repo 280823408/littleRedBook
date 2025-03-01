@@ -9,4 +9,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface TagClient {
     @PostMapping("getTagsByNoteId")
     public Result getTagsByNoteId(@RequestParam Integer noteId);
+    @PostMapping("getNoteIdByTagId")
+    public Result getNoteIdByTagId(@RequestParam Integer tagId);
 }

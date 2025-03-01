@@ -28,10 +28,10 @@ public class NoteDTO {
     private Timestamp updateTime;
     /** 创建时间 */
     private Timestamp createTime;
+    /** 点赞数 */
+    private Double likeNum;
     /** 所属用户 */
     private User user;
     /** 标签 */
     private List<Tag> tags;
-    /** 点赞数 */
-    private Integer likeCount;
 }

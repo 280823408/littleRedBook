@@ -30,4 +30,12 @@ public interface TagMapper extends BaseMapper<Tag> {
      */
     @Select("SELECT * FROM tag JOIN tag_note ON tag.id = tag_note.tag_id WHERE tag_note.note_id = #{noteId}")
     List<Tag> selectTagsByNoteId(Integer noteId);
+
+    /**
+     * 根据标签ID查询关联的笔记ID列表
+     * @param tagId
+     * @return
+     */
+    @Select("SELECT note_id FROM tag_note WHERE tag_id = #{tagId}")
+    List<Integer> selectNoteIdByTagId(Integer tagId);
 }

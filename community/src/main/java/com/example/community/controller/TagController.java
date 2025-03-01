@@ -76,6 +76,17 @@ public class TagController {
     }
 
     /**
+     * 获取指定标签关联的所有笔记ID
+     *
+     * @param tagId 标签唯一标识
+     * @return 包含关联标签列表的Result对象
+     */
+    @PostMapping("getNoteIdByTagId")
+    public Result getNoteIdByTagId(@RequestParam Integer tagId) {
+        return tagService.getNoteIdByTagId(tagId);
+    }
+
+    /**
      * 创建标签与笔记的关联关系
      *
      * @param tagId 标签ID

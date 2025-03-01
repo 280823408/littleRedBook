@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
 import org.springframework.util.DigestUtils;
 
@@ -25,11 +26,13 @@ import java.util.stream.Collectors;
 public class StringRedisClient {
     private final StringRedisTemplate stringRedisTemplate;
     private final RedissonClient redissonClient;
+    private final ValueOperations<String, String> valueOperations;
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
 
     public StringRedisClient(StringRedisTemplate stringRedisTemplate, RedissonClient redissonClient) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.redissonClient = redissonClient;
+        this.valueOperations = stringRedisTemplate.opsForValue();
     }
 
     /**
@@ -38,7 +41,7 @@ public class StringRedisClient {
      * @return 对应的字符串值，如果键不存在返回null
      */
     public String get(String key) {
-        return stringRedisTemplate.opsForValue().get(key);
+        return valueOperations.get(key);
     }
 
     /**
@@ -59,7 +62,7 @@ public class StringRedisClient {
      * @return 对应值的列表，不存在的键对应位置为null
      */
     public List<String> multiGet(List<String> keys) {
-        return stringRedisTemplate.opsForValue().multiGet(keys);
+        return valueOperations.multiGet(keys);
     }
 
     /**
@@ -84,7 +87,7 @@ public class StringRedisClient {
      * @param unit 过期时间单位
      */
     public void set(String key, Object value, Long time, TimeUnit unit) {
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(value), time, unit);
+        valueOperations.set(key, JSONUtil.toJsonStr(value), time, unit);
     }
 
     /**
@@ -94,7 +97,7 @@ public class StringRedisClient {
      * @return true-设置成功，false-键已存在
      */
     public Boolean setIfAbsent(String key, Object value) {
-        return stringRedisTemplate.opsForValue().setIfAbsent(key, JSONUtil.toJsonStr(value));
+        return valueOperations.setIfAbsent(key, JSONUtil.toJsonStr(value));
     }
 
     /**
@@ -106,7 +109,7 @@ public class StringRedisClient {
      * @return true-设置成功，false-键已存在
      */
     public Boolean setIfAbsent(String key, Object value, long timeout, TimeUnit unit) {
-        return stringRedisTemplate.opsForValue().setIfAbsent(key, JSONUtil.toJsonStr(value), timeout, unit);
+        return valueOperations.setIfAbsent(key, JSONUtil.toJsonStr(value), timeout, unit);
     }
 
     /**
@@ -119,7 +122,7 @@ public class StringRedisClient {
                         Map.Entry::getKey,
                         e -> JSONUtil.toJsonStr(e.getValue())
                 ));
-        stringRedisTemplate.opsForValue().multiSet(stringMap);
+        valueOperations.multiSet(stringMap);
     }
 
     /**
@@ -176,7 +179,7 @@ public class StringRedisClient {
      * @return 递增后的值
      */
     public Long increment(String key) {
-        return stringRedisTemplate.opsForValue().increment(key);
+        return valueOperations.increment(key);
     }
 
     /**
@@ -186,7 +189,7 @@ public class StringRedisClient {
      * @return 递增后的值
      */
     public Long increment(String key, long delta) {
-        return stringRedisTemplate.opsForValue().increment(key, delta);
+        return valueOperations.increment(key, delta);
     }
 
     /**
@@ -195,7 +198,7 @@ public class StringRedisClient {
      * @return 递减后的值
      */
     public Long decrement(String key) {
-        return stringRedisTemplate.opsForValue().decrement(key);
+        return valueOperations.decrement(key);
     }
 
     /**
@@ -205,7 +208,7 @@ public class StringRedisClient {
      * @return 递减后的值
      */
     public Long decrement(String key, long delta) {
-        return stringRedisTemplate.opsForValue().decrement(key, delta);
+        return valueOperations.decrement(key, delta);
     }
 
     /**
@@ -219,7 +222,7 @@ public class StringRedisClient {
         RedisData redisData = new RedisData();
         redisData.setData(value);
         redisData.setExpireTime(LocalDateTime.now().plusSeconds(unit.toSeconds(time)));
-        stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
+        valueOperations.set(key, JSONUtil.toJsonStr(redisData));
     }
 
     /**
@@ -372,7 +375,7 @@ public class StringRedisClient {
                 Thread.sleep(50);
                 return this.queryListWithMutex(keyPrefix, id, type, dbFallback, time, unit);
             }
-            json = stringRedisTemplate.opsForValue().get(key);
+            json = valueOperations.get(key);
             if (StrUtil.isNotBlank(json)) {
                 return JSONUtil.toList(json, type);
             }

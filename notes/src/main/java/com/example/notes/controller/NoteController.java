@@ -2,21 +2,13 @@ package com.example.notes.controller;
 
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.Note;
-import com.example.littleredbook.entity.Tag;
-import com.example.littleredbook.entity.User;
 import com.example.littleredbook.utils.HashRedisClient;
-import com.example.notes.dto.NoteDTO;
 import com.example.notes.service.INoteService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
-import java.lang.reflect.Field;
-import java.sql.Timestamp;
 import java.text.ParseException;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Slf4j
 @CrossOrigin
@@ -34,6 +26,30 @@ public class NoteController {
     @PostMapping("getNotesByUserId")
     public Result getNotesByUserId(@RequestParam Integer userId) {
         return noteService.getNotesByUserId(userId);
+    }
+    @PostMapping("getNotesByTitle")
+    public Result getNotesByTitle(@RequestParam String title) {
+        return noteService.getNotesByTitle(title);
+    }
+    @PostMapping("getAllNotesSortedByLikeNum")
+    public Result getAllNotesSortedByLikeNum(@RequestParam Integer userId) {
+        return noteService.getAllNotesSortedByLikeNum(userId);
+    }
+    @PostMapping("getAllNotesSortedByCreatTime")
+    public Result getAllNotesSortedByCreatTime(@RequestParam Integer userId) {
+        return noteService.getAllNotesSortedByCreatTime(userId);
+    }
+    @PostMapping("getNotesByTag")
+    public Result getNotesByTag(@RequestParam Integer tagId) {
+        return noteService.getNotesByTag(tagId);
+    }
+    @PostMapping("addNote")
+    public Result addNote(@RequestBody Note note) {
+        return noteService.addNote(note);
+    }
+    @PostMapping("updateNote")
+    public Result updateNote(@RequestBody Note note) {
+        return noteService.updateNote(note);
     }
 //    /**
 //     * 测试hash结构的redis存储

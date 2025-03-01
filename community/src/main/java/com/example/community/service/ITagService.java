@@ -49,6 +49,12 @@ public interface ITagService extends IService<Tag> {
      * @return 包含关联标签列表的Result对象
      */
     Result getTagsByNoteId(Integer noteId);
+    /**
+     * 查询指定标签关联的所有笔记
+     * @param tagId 标签唯一标识
+     * @return 包含关联笔记列表的Result对象
+     */
+    Result getNoteIdByTagId(Integer tagId);
 
     /**
      * 插入标签与笔记的关联关系

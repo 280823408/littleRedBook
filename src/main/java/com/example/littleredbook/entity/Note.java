@@ -32,6 +32,9 @@ public class Note {
     private String resoure;
     /** 笔记正文内容 */
     private String content;
+    /** 点赞数 */
+    @TableField("like_num")
+    private Double likeNum;
     /** 更新时间 */
     @TableField("update_time")
     private Timestamp updateTime;
