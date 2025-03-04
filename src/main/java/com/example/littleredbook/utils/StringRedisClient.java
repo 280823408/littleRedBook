@@ -326,7 +326,7 @@ public class StringRedisClient {
         RLock lock = redissonClient.getLock(lockKey);
         R result;
         try {
-            boolean isLock = lock.tryLock(100, 10, TimeUnit.SECONDS);
+            boolean isLock = lock.tryLock(1, 10, TimeUnit.SECONDS);
             if (!isLock) {
                 Thread.sleep(50);
                 return queryWithMutex(keyPrefix, id, type, dbFallback, time, unit);

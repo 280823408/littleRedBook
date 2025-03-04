@@ -15,8 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static com.example.littleredbook.utils.RedisConstants.CACHE_TAG_KEY;
-import static com.example.littleredbook.utils.RedisConstants.CACHE_TAG_TTL;
+import static com.example.littleredbook.utils.RedisConstants.*;
+
 /**
  * 标签服务实现类
  *
@@ -46,7 +46,6 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
      * @return 包含标签实体或错误信息的Result对象
      */
     @Override
-    @Transactional
     public Result getTagById(Integer id) {
         Tag tag = getById(id);
         if (tag == null) {
@@ -60,9 +59,8 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
      * @return 包含标签集合的Result对象
      */
     @Override
-    @Transactional
     public Result getAllTags() {
-        String tagJson = stringRedisClient.get(CACHE_TAG_KEY);
+        String tagJson = stringRedisClient.get(CACHE_TAGLIST_KEY);
         if (!StrUtil.isBlank(tagJson)) {
             return Result.ok(JSONUtil.toList(tagJson, Tag.class));
         }
@@ -70,7 +68,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
         if (tags.isEmpty()) {
             return Result.fail("标签不存在！");
         }
-        stringRedisClient.set(CACHE_TAG_KEY, JSONUtil.toJsonStr(tags), CACHE_TAG_TTL, TimeUnit.MINUTES);
+        stringRedisClient.set(CACHE_TAGLIST_KEY, JSONUtil.toJsonStr(tags), CACHE_TAGLIST_TTL, TimeUnit.MINUTES);
         return Result.ok(tags);
     }
 
@@ -85,7 +83,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
         if (!save(tag)) {
             return Result.fail("添加新标签失败！");
         }
-        stringRedisClient.delete(CACHE_TAG_KEY);
+        stringRedisClient.delete(CACHE_TAG_KEY + tag.getId());
         return Result.ok();
     }
 
@@ -95,7 +93,6 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
      * @return 待实现的Result对象
      */
     @Override
-    @Transactional
     public Result getTagsByNoteId(Integer noteId) {
         return Result.ok(baseMapper.selectTagsByNoteId(noteId));
     }

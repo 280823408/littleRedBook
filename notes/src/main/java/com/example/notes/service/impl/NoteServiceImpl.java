@@ -12,7 +12,7 @@ import com.example.littleredbook.utils.StringRedisClient;
 import com.example.notes.dto.NoteDTO;
 import com.example.notes.mapper.NoteMapper;
 import com.example.notes.service.INoteService;
-import com.example.notes.utils.LoginClient;
+import com.example.notes.utils.UserCenterClient;
 import com.example.notes.utils.TagClient;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -26,18 +26,43 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static com.example.littleredbook.utils.RedisConstants.*;
+import static com.example.littleredbook.utils.RedisConstants.CACHE_NOTELIST_TTL;
 
+/**
+ * 笔记服务实现类
+ *
+ * <p>功能说明：
+ * 1. 实现笔记核心业务逻辑处理<br>
+ * 2. 集成多级缓存架构（Hash结构+字符串结构）<br>
+ * 3. 支持复杂查询的缓存穿透解决方案<br>
+ * 4. 实现跨服务数据聚合（用户服务+标签服务）<br>
+ * 5. 保证数据最终一致性（@Transactional）<br>
+ *
+ * <p>设计要点：
+ * - 采用互斥锁解决缓存击穿问题<br>
+ * - 使用Hutool BeanUtil实现安全对象转换<br>
+ * - 支持多种排序规则的内存排序<br>
+ * - 缓存更新采用延迟双删策略<br>
+ *
+ * @author Mike
+ * @since 2025/3/1
+ */
 @Service
 public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements INoteService {
     @Resource
-    private LoginClient loginClient;
+    private UserCenterClient userCenterClient;
     @Resource
     private TagClient tagClient;
     @Resource
     private StringRedisClient stringRedisClient;
     @Resource
     private HashRedisClient hashRedisClient;
-
+    /**
+     * 根据笔记ID查询完整笔记信息
+     * @param id 笔记唯一标识
+     * @return Result标准响应，包含笔记详情或错误信息
+     * @throws ParseException 当时间格式解析异常时抛出
+     */
     @Override
     public Result getNoteById(Integer id) throws ParseException {
         NoteDTO noteDTO = hashRedisClient.queryWithMutex(
@@ -81,7 +106,6 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
      * @return
      */
     @Override
-    @Transactional
     public Result getNotesByUserId(Integer userId) {
         List<NoteDTO> noteDTOS = stringRedisClient.queryListWithMutex(
                 CACHE_NOTE_USER_KEY,
@@ -98,12 +122,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     }
 
     /**
-     * 根据标题查询笔记
-     * @param title
-     * @return
+     * 根据标题关键词模糊查询笔记
+     * @param title 搜索关键词
+     * @return Result标准响应，包含匹配的笔记列表
      */
     @Override
-    @Transactional
     public Result getNotesByTitle(String title) {
         List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id").like("title", title), obj -> (Integer) obj);
         List<NoteDTO> noteDTOS = new ArrayList<>();
@@ -113,11 +136,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteIds.forEach(id -> {
             try {
                 noteDTOS.add(hashRedisClient.queryWithMutex(
-                        CACHE_NOTE_KEY,
+                        CACHE_NOTELIST_KEY,
                         id,
                         NoteDTO.class,
                         this::getNoteDTOFromDB,
-                        CACHE_NOTE_TTL,
+                        CACHE_NOTELIST_TTL,
                         TimeUnit.MINUTES
                 ));
             } catch (ParseException e) {
@@ -127,8 +150,12 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         return Result.ok(noteDTOS);
     }
 
+    /**
+     * 获取全站笔记并按点赞数降序排列
+     * @param userId 当前用户ID（预留字段）
+     * @return Result标准响应，包含排序后的笔记列表
+     */
     @Override
-    @Transactional
     public Result getAllNotesSortedByLikeNum(Integer userId) {
         List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id"), obj -> (Integer) obj);
         List<NoteDTO> noteDTOS = new ArrayList<>();
@@ -138,11 +165,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteIds.forEach(id -> {
             try {
                 noteDTOS.add(hashRedisClient.queryWithMutex(
-                        CACHE_NOTE_KEY,
+                        CACHE_NOTELIST_KEY,
                         id,
                         NoteDTO.class,
                         this::getNoteDTOFromDB,
-                        CACHE_NOTE_TTL,
+                        CACHE_NOTELIST_TTL,
                         TimeUnit.MINUTES
                 ));
             } catch (ParseException e) {
@@ -153,8 +180,12 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         return Result.ok(noteDTOS);
     }
 
+    /**
+     * 获取全站笔记并按创建时间倒序排列
+     * @param userId 当前用户ID（预留字段）
+     * @return Result标准响应，包含时间排序的笔记列表
+     */
     @Override
-    @Transactional
     public Result getAllNotesSortedByCreatTime(Integer userId) {
         List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id"), obj -> (Integer) obj);
         List<NoteDTO> noteDTOS = new ArrayList<>();
@@ -164,11 +195,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteIds.forEach(id -> {
             try {
                 noteDTOS.add(hashRedisClient.queryWithMutex(
-                        CACHE_NOTE_KEY,
+                        CACHE_NOTELIST_KEY,
                         id,
                         NoteDTO.class,
                         this::getNoteDTOFromDB,
-                        CACHE_NOTE_TTL,
+                        CACHE_NOTELIST_TTL,
                         TimeUnit.MINUTES
                 ));
             } catch (ParseException e) {
@@ -179,8 +210,12 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         return Result.ok(noteDTOS);
     }
 
+    /**
+     * 根据标签查询关联笔记
+     * @param tagId 标签ID
+     * @return Result标准响应，包含标签关联的笔记列表
+     */
     @Override
-    @Transactional
     public Result getNotesByTag(Integer tagId) {
         Object tagData = tagClient.getNoteIdByTagId(tagId).getData();
         List<Integer> noteIds = BeanUtil.copyToList((List<?>) tagData, Integer.class);
@@ -191,11 +226,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteIds.forEach(id -> {
             try {
                 noteDTOS.add(hashRedisClient.queryWithMutex(
-                        CACHE_NOTE_KEY,
+                        CACHE_NOTELIST_KEY,
                         id,
                         NoteDTO.class,
                         this::getNoteDTOFromDB,
-                        CACHE_NOTE_TTL,
+                        CACHE_NOTELIST_TTL,
                         TimeUnit.MINUTES
                 ));
             } catch (ParseException e) {
@@ -206,6 +241,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         return Result.ok(noteDTOS);
     }
 
+    /**
+     * 新增笔记（带缓存清理）
+     * @param note 笔记实体
+     * @return Result标准响应，包含操作结果
+     */
     @Override
     @Transactional
     public Result addNote(Note note) {
@@ -218,7 +258,13 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         return Result.ok();
     }
 
+    /**
+     * 更新笔记信息（带缓存失效）
+     * @param note 包含更新字段的笔记实体
+     * @return Result标准响应，包含操作结果
+     */
     @Override
+    @Transactional
     public Result updateNote(Note note) {
         Integer id = note.getId();
         if (id == null) {
@@ -230,14 +276,17 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     }
 
     /**
-     * 数据库回源函数：查询数据库并组装 NoteDTO
+     * 数据库回源方法：组装完整笔记DTO
+     * @param id 笔记ID
+     * @return 组合用户信息和标签的完整DTO对象
+     * @implNote 1. 调用用户服务获取用户信息 2. 调用标签服务获取标签数据
      */
     private NoteDTO getNoteDTOFromDB(Integer id) {
         Note note = getById(id);
         if (note == null) {
             return null;
         }
-        Object userData = loginClient.getUserById(note.getUserId()).getData();
+        Object userData = userCenterClient.getUserById(note.getUserId()).getData();
         Object tagData = tagClient.getTagsByNoteId(id).getData();
         User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
         List<Tag> tags = BeanUtil.copyToList((List<?>) tagData, Tag.class);
@@ -256,14 +305,17 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     }
 
     /**
-     * 数据库回源函数：查询数据库userId并组装 NoteDTOs
+     * 数据库回源方法：批量获取用户笔记DTO
+     * @param userId 用户ID
+     * @return 包含用户所有笔记的DTO列表
+     * @implNote 1. 批量查询优化 2. 统一用户信息填充
      */
     private List<NoteDTO> getNoteDTOsFromDBForUserId(Integer userId) {
         List<Note> notes = list(new QueryWrapper<Note>().eq("user_id", userId));
         if (notes.isEmpty()) {
             return Collections.emptyList();
         }
-        Object data = loginClient.getUserById(userId).getData();
+        Object data = userCenterClient.getUserById(userId).getData();
         User user = BeanUtil.mapToBean((Map<?, ?>) data, User.class, true);
         if (user == null) {
             log.error("用户服务调用失败");

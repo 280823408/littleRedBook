@@ -164,16 +164,22 @@ public class HashRedisClient {
      */
     public void hMultiSet(String key, Object bean) {
         Map<String, String> map = new HashMap<>();
-        // 原有对象处理逻辑
         Field[] fields = bean.getClass().getDeclaredFields();
         for (Field field : fields) {
-            field.setAccessible(true);
+            // 跳过JDK内部类的字段
+            Class<?> declaringClass = field.getDeclaringClass();
+            String packageName = declaringClass.getPackageName();
+            if (packageName.startsWith("java.") || packageName.startsWith("sun.")) {
+                log.debug("Skipping JDK internal field: {}", field.getName());
+                continue;
+            }
             try {
+                field.setAccessible(true);
                 Object obj = field.get(bean);
                 String str = "";
                 if (isSimpleType(obj)) {
                     str = String.valueOf(obj);
-                } else  if (obj.getClass() == Timestamp.class){
+                } else if (obj != null && obj.getClass() == Timestamp.class) {
                     str = DateUtils.TimeStampToString((Timestamp) obj);
                 } else {
                     str = JSONUtil.toJsonStr(obj);
@@ -443,10 +449,10 @@ public class HashRedisClient {
         if (result != null) {
             return result;
         }
-        String lockKey = RedisConstants.LOCK_PREFIX + id;
+        String lockKey = RedisConstants.LOCK_HASH_PREFIX + id;
         RLock lock = redissonClient.getLock(lockKey);
         try {
-            boolean isLock = lock.tryLock(100, 60, TimeUnit.SECONDS);
+            boolean isLock = lock.tryLock(1, 10, TimeUnit.SECONDS);
             if (!isLock) {
                 Thread.sleep(50);
                 return queryWithMutex(keyPrefix, id, type, dbFallback, time, unit);
