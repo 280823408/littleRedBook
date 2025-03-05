@@ -7,6 +7,7 @@ import com.example.community.mapper.TagMapper;
 import com.example.community.service.ITagService;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.Tag;
+import com.example.littleredbook.utils.HashRedisClient;
 import com.example.littleredbook.utils.StringRedisClient;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -39,7 +40,8 @@ import static com.example.littleredbook.utils.RedisConstants.*;
 public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagService {
     @Resource
     private StringRedisClient stringRedisClient;
-
+    @Resource
+    private HashRedisClient hashRedisClient;
     /**
      * 根据标签ID查询标签信息
      * @param id 标签唯一标识
@@ -49,7 +51,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
     public Result getTagById(Integer id) {
         Tag tag = getById(id);
         if (tag == null) {
-            return Result.fail("标签不存在！");
+            return Result.fail("标签不存在");
         }
         return Result.ok(tag);
     }
@@ -66,7 +68,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
         }
         List<Tag> tags = list();
         if (tags.isEmpty()) {
-            return Result.fail("标签不存在！");
+            return Result.fail("标签不存在");
         }
         stringRedisClient.set(CACHE_TAGLIST_KEY, JSONUtil.toJsonStr(tags), CACHE_TAGLIST_TTL, TimeUnit.MINUTES);
         return Result.ok(tags);
@@ -81,7 +83,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
     @Transactional
     public Result addTag(Tag tag) {
         if (!save(tag)) {
-            return Result.fail("添加新标签失败！");
+            return Result.fail("添加新标签失败");
         }
         stringRedisClient.delete(CACHE_TAG_KEY + tag.getId());
         return Result.ok();
@@ -109,8 +111,9 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
      * @return 待实现的Result对象
      */
     @Override
+    @Transactional
     public Result addNoteTag(Integer tagId, Integer noteId) {
         // TODO: 实现标签与笔记关联关系存储
-        return Result.fail("功能暂未开放！");
+        return Result.fail("功能暂未开放");
     }
 }

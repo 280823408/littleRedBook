@@ -24,6 +24,14 @@ public class RedisConstants {
     public static final Long CACHE_BROWSE_TTL = 10L;
     public static final String CACHE_BROWSE_USER_KEY = "littleredbook:cache:browse:user:";
     public static final Long CACHE_BROWSE_USER_TTL = 30L;
+    public static final String CACHE_COLLECTIONS_KEY = "littleredbook:cache:collections:";
+    public static final Long CACHE_COLLECTIONS_TTL = 10L;
+    public static final String CACHE_COLLECTIONS_USER_KEY = "littleredbook:cache:collections:user:";
+    public static final Long CACHE_COLLECTIONS_USER_TTL = 30L;
+    public static final String CACHE_CONCERN_KEY = "littleredbook:cache:collections:";
+    public static final Long CACHE_CONCERN_TTL = 10L;
+    public static final String CACHE_CONCERN_USER_KEY = "littleredbook:cache:collections:user:";
+    public static final Long CACHE_CONCERN_USER_TTL = 30L;
     public static final Long CACHE_TAG_TTL = 60L;
     public static final Long CACHE_SHOP_TTL = 30L;
     public static final String CACHE_SHOP_KEY = "cache:shop:";

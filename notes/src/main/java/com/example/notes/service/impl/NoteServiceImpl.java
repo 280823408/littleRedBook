@@ -249,12 +249,10 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     @Override
     @Transactional
     public Result addNote(Note note) {
-        Integer id = note.getId();
-        if (id == null) {
-            return Result.fail("笔记ID不能为空!");
+        if (!updateById(note)) {
+            return Result.fail("添加新笔记失败");
         }
-        updateById(note);
-        hashRedisClient.delete(CACHE_NOTE_KEY + id);
+        hashRedisClient.delete(CACHE_NOTE_KEY + note.getId());
         return Result.ok();
     }
 

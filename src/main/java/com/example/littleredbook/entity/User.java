@@ -30,4 +30,7 @@ public class User {
     /** 用户密码，非空 */
     @TableField("user_password")
     private String userPassword;
+    /** 粉丝数量 */
+    @TableField("fans_num")
+    private Double FansNum;
 }

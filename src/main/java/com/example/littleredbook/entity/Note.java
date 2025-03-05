@@ -35,6 +35,9 @@ public class Note {
     /** 点赞数 */
     @TableField("like_num")
     private Double likeNum;
+    /** 收藏数 */
+    @TableField("collections_num")
+    private Double collectionsNum;
     /** 更新时间 */
     @TableField("update_time")
     private Timestamp updateTime;

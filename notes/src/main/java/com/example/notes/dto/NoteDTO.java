@@ -52,6 +52,9 @@ public class NoteDTO {
     /** 点赞数 */
     private Double likeNum;
 
+    /** 收藏数 */
+    private Double collectionsNum;
+
     /** 所属用户 */
     private User user;
 

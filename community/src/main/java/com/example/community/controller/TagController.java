@@ -38,7 +38,7 @@ public class TagController {
      * @param id 标签唯一标识
      * @return 包含标签实体或错误信息的Result对象
      */
-    @PostMapping("getTagById")
+    @GetMapping("getTagById")
     public Result getTagById(@RequestParam Integer id) {
         return tagService.getTagById(id);
     }
@@ -70,7 +70,7 @@ public class TagController {
      * @param noteId 笔记唯一标识
      * @return 包含关联标签列表的Result对象
      */
-    @PostMapping ("getTagsByNoteId")
+    @GetMapping ("getTagsByNoteId")
     public Result getTagsByNoteId(@RequestParam Integer noteId) {
         return tagService.getTagsByNoteId(noteId);
     }
@@ -81,7 +81,7 @@ public class TagController {
      * @param tagId 标签唯一标识
      * @return 包含关联标签列表的Result对象
      */
-    @PostMapping("getNoteIdByTagId")
+    @GetMapping("getNoteIdByTagId")
     public Result getNoteIdByTagId(@RequestParam Integer tagId) {
         return tagService.getNoteIdByTagId(tagId);
     }
