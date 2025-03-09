@@ -93,4 +93,17 @@ with root cause  com.baomidou.mybatisplus.core.exceptions.MybatisPlusException: 
 实际上，在 MyBatis-Plus 中，query() 是 QueryChainWrapper 的入口方法，返回的是 QueryChainWrapper 对象，而非直接可用的 QueryWrapper。  
 selectCount 方法需要接收 Wrapper<T> 类型参数（通常为 QueryWrapper），但实际传入的是 QueryChainWrapper。  
 MyBatis-Plus 尝试将 QueryChainWrapper 转换为 SQL 时，发现其不包含有效的 getSqlFirst 实现，抛出异常。  
-而采用getWrapper() 从 QueryChainWrapper 中提取出真正的 QueryWrapper 实例，即可解决问题。
+而采用getWrapper() 从 QueryChainWrapper 中提取出真正的 QueryWrapper 实例，即可解决问题。  
+7.采用先操作数据库再操作缓存除了防止多线程并发时可能出现的仍写入旧数据的情况外，还可以确保存入缓存的数据中`ID`一定非空。
+具体情况如下代码所示
+```java
+public Result addConcern(Concern concern) {
+        if (!save(concern)) {
+            return Result.fail("添加新的关注记录失败");
+        }
+        hashRedisClient.hMultiSet(CACHE_CONCERN_KEY + concern.getId(), concern);
+        return Result.ok();
+    }
+```
+假设此时我们采用先存入缓存再写入数据库的情况，那么当concern的`Id`为数据库中的自增字段，那么从前端获取的concern数据中的id
+大概率为空，此时会产生空调用报错，并且写入缓存的数据也为空，从而造成隐患。

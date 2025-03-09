@@ -13,7 +13,7 @@ import java.sql.Timestamp;
 
 
 /**
- * 趣记评论表
+ * 笔记评论表
  */
 @Data
 @NoArgsConstructor

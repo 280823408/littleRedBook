@@ -307,6 +307,7 @@ public class SortedSetRedisClient {
             }
         }
     }
+
     private Boolean containsPlaceholder(String key) {
         return this.rangeByScore(key, -Double.MAX_VALUE, -Double.MAX_VALUE, String.class)
                 .stream()

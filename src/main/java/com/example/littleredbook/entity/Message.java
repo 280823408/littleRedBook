@@ -1,16 +1,17 @@
 package com.example.littleredbook.entity;
 
-
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.sql.Timestamp;
 /**
- * 私信表
+ * 私信消息表
  */
 @Data
 @NoArgsConstructor
@@ -19,8 +20,14 @@ import lombok.NoArgsConstructor;
 public class Message {
   @TableId(value = "id", type = IdType.AUTO)
   private Integer id;
-  @TableField("user1_id")
-  private Integer user1Id;
-  @TableField("user2_id")
-  private Integer user2Id;
+  @TableField("sender_id")
+  private Integer senderId;
+  @TableField("receiver_id")
+  private Integer receiverId;
+  @TableField("inner_message")
+  private String innerMessage;
+  @TableField("send_time")
+  private Timestamp sendTime;
+  @TableField("is_read")
+  private Boolean isRead;
 }

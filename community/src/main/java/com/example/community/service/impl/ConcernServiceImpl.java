@@ -66,8 +66,10 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
     @Override
     @Transactional
     public Result removeConcernById(Integer id) {
+        if (!removeById(id)) {
+            return Result.fail("删除关注记录" + id + "失败");
+        }
         hashRedisClient.delete(CACHE_CONCERN_KEY + id);
-        removeById(id);
         return Result.ok();
     }
 
@@ -77,8 +79,8 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
         Integer id = baseMapper.selectOne(
                 query().getWrapper().eq("user_id", userId)
                         .eq("fans_id", fansId)).getId();
-        hashRedisClient.delete(CACHE_CONCERN_KEY + id);
         removeById(id);
+        hashRedisClient.delete(CACHE_CONCERN_KEY + id);
         return Result.ok();
     }
 

@@ -22,10 +22,8 @@ public class LikeNote {
   private Integer id;
   @TableField("note_id")
   private Integer noteId;
-  @TableField("user1_id")
-  private Integer user1Id;
-  @TableField("user2_id")
-  private Integer user2Id;
+  @TableField("user_id")
+  private Integer userId;
   @TableField("like_time")
   private Timestamp likeTime;
 }

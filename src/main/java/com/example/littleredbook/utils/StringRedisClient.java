@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -395,4 +396,57 @@ public class StringRedisClient {
         }
         return result;
     }
+
+    /**
+     * 双参数版缓存查询方法
+     * @param keyPattern 缓存键模式（需含两个占位符，如 "cache:message:chat:%s:%s"）
+     * @param type 返回类型
+     * @param dbFallback 数据库回查函数（接收两个参数）
+     * @param time 缓存时间
+     * @param unit 时间单位
+     * @param param1 参数1
+     * @param param2 参数2
+     */
+    public <R> List<R> queryListWithMutex(String keyPattern, Class<R> type,
+                                          BiFunction<Integer, Integer, List<R>> dbFallback,
+                                          Long time, TimeUnit unit,
+                                          Integer param1, Integer param2) {
+        String key = String.format(keyPattern, param1, param2);
+        String json = this.get(key);
+        if (StrUtil.isNotBlank(json)) {
+            return JSONUtil.toList(json, type);
+        }
+        if (json != null) {
+            return Collections.emptyList();
+        }
+        String lockKey = RedisConstants.LOCK_PREFIX + key;
+        RLock lock = redissonClient.getLock(lockKey);
+        List<R> result;
+        try {
+            boolean isLock = lock.tryLock(100, 10, TimeUnit.SECONDS);
+            if (!isLock) {
+                Thread.sleep(50);
+                return queryListWithMutex(keyPattern, type, dbFallback, time, unit, param1, param2);
+            }
+            json = valueOperations.get(key);
+            if (StrUtil.isNotBlank(json)) {
+                return JSONUtil.toList(json, type);
+            }
+            if (json != null) {
+                return Collections.emptyList();
+            }
+            result = dbFallback.apply(param1, param2);
+            if (result == null || result.isEmpty()) {
+                this.set(key, "[]", RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES);
+                return Collections.emptyList();
+            }
+            this.set(key, result, time, unit);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
+        }
+        return result;
+    }
+
 }

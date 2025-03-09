@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.sql.Timestamp;
+
 /**
  * 关注关系实体类
  */
@@ -25,4 +27,7 @@ public class Concern {
   /** 被关注用户ID（关联用户表） */
   @TableField("user_id")
   private Integer userId;
+  /** 关注时间 */
+  @TableField("like_time")
+  private Timestamp likeTime;
 }

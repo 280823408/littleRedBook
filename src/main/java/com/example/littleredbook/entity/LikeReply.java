@@ -23,10 +23,8 @@ public class LikeReply {
   private Integer id;
   @TableField("reply_id")
   private Integer replyId;
-  @TableField("user1_id")
-  private Integer user1Id;
-  @TableField("user2_id")
-  private Integer user2Id;
+  @TableField("user_id")
+  private Integer userId;
   @TableField("like_time")
   private Timestamp likeTime;
 }

@@ -26,11 +26,8 @@ public class LikeComment {
   @TableField("comment_id")
   private Integer commentId;
   /** 点赞用户ID（关联用户表） */
-  @TableField("user1_id")
-  private Integer user1Id;
-  /** 被点赞用户ID（关联用户表） */
-  @TableField("user2_id")
-  private Integer user2Id;
+  @TableField("user_id")
+  private Integer userId;
   /** 点赞时间 */
   @TableField("like_time")
   private Timestamp likeTime;
