@@ -249,8 +249,8 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     @Override
     @Transactional
     public Result addNote(Note note) {
-        if (!updateById(note)) {
-            return Result.fail("添加新笔记失败");
+        if (!this.updateById(note)) {
+            throw new RuntimeException("添加新笔记失败");
         }
         hashRedisClient.delete(CACHE_NOTE_KEY + note.getId());
         return Result.ok();
@@ -268,7 +268,9 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         if (id == null) {
             return Result.fail("笔记ID不能为空!");
         }
-        save(note);
+        if (!this.save(note)) {
+            throw new RuntimeException("修改笔记失败");
+        }
         hashRedisClient.delete(CACHE_NOTE_KEY + id);
         return Result.ok();
     }

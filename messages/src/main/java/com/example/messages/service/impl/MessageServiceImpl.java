@@ -68,7 +68,7 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
             return Result.fail("发出消息时间超出10分钟，不予撤回");
         }
         if (!removeById(message.getId())) {
-            return Result.fail("删除私信" + message.getId() + "失败");
+            throw new RuntimeException("删除私信" + message.getId() + "失败");
         }
         hashRedisClient.delete(CACHE_MESSAGE_KEY + message.getId());
         return Result.ok();
@@ -78,7 +78,7 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
     @Transactional
     public Result removeMessage(Integer id) {
         if (!this.removeById(id)) {
-            return Result.fail("删除私信" + id + "失败");
+            throw new RuntimeException("删除私信" + id + "失败");
         }
         hashRedisClient.delete(CACHE_MESSAGE_KEY + id);
         return Result.ok();
@@ -110,8 +110,11 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
     @Override
     @Transactional
     public Result addMessage(Message message) {
-        if (!this.save(message)) return Result.fail("添加私信失败");
+        if (!this.save(message)) {
+            throw new RuntimeException("添加私信失败");
+        }
         hashRedisClient.hMultiSet(CACHE_MESSAGE_KEY + message.getId(), message);
+        hashRedisClient.expire(CACHE_MESSAGE_KEY + message.getId(), CACHE_MESSAGE_TTL, TimeUnit.MINUTES);
         return Result.ok();
     }
 

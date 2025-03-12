@@ -59,23 +59,60 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
         return Result.ok(likeReplyList);
     }
 
+    // TODO 可以在Redis中设计LikeReply的二级索引，即通过replyId+userId -> id的映射关系，从而达到使用Redis优化查询的目的
+    // TODO 本方法未处理缓存穿透和缓存击穿（待后续优化）
+    @Override
+    public Result getLikeReplyByReplyIdAndUserId(Integer replyId, Integer userId) {
+        String key = CACHE_LIKEREPLY_REPLY_USER_KEY + replyId + ":" + userId;
+        try{
+            Integer id = hashRedisClient.hMultiGet(key, Integer.class);
+            LikeReply likeReply = null;
+            if (id != null) {
+                likeReply = (LikeReply) this.getLikeReplyById(id).getData();
+            }
+            if (likeReply == null) {
+                likeReply = query().select("id").eq("reply_id", replyId)
+                        .eq("user_id", userId).one();
+            }
+            if (likeReply == null) {
+                return Result.fail("该点赞回复评论记录不存在");
+            }
+            if (id == null) {
+                hashRedisClient.hMultiSet(key, likeReply.getId());
+                hashRedisClient.expire(key,
+                        CACHE_LIKEREPLY_REPLY_USER_TTL, TimeUnit.MINUTES);
+            }
+            return Result.ok(likeReply);
+        } catch (ParseException e) {
+            return Result.fail("获取点赞记录失败");
+        }
+
+    }
+
     @Override
     @Transactional
     public Result removeLikeReply(Integer id) {
-        if (!removeById(id)) {
-            return Result.fail("删除点赞回复记录" + id + "失败");
+        LikeReply likeReply = (LikeReply) this.getLikeReplyById(id).getData();
+        if (!this.removeById(id)) {
+            throw new RuntimeException("删除点赞回复记录" + id + "失败");
         }
         hashRedisClient.delete(CACHE_LIKEREPLY_KEY + id);
+        hashRedisClient.delete(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId());
         return Result.ok();
     }
 
     @Override
     @Transactional
     public Result addLikeReply(LikeReply likeReply) {
-        if (!save(likeReply)) {
-            return Result.fail("添加新的点赞回复记录失败");
+        if (!this.save(likeReply)) {
+            throw new RuntimeException("添加新的点赞回复记录失败");
         }
         hashRedisClient.hMultiSet(CACHE_LIKEREPLY_KEY + likeReply.getId(), likeReply);
+        hashRedisClient.expire(CACHE_LIKEREPLY_KEY + likeReply.getId(), CACHE_LIKEREPLY_TTL, TimeUnit.MINUTES);
+        hashRedisClient.hMultiSet(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId(),
+                likeReply);
+        hashRedisClient.expire(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId(),
+                CACHE_LIKEREPLY_REPLY_USER_TTL, TimeUnit.MINUTES);
         return Result.ok();
     }
 

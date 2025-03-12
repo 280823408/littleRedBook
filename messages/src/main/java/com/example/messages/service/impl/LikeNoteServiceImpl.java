@@ -58,23 +58,59 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
         return Result.ok(likeNoteList);
     }
 
+    // TODO 可以在Redis中设计LikeNote的二级索引，即通过noteId+userId -> id的映射关系，从而达到使用Redis优化查询的目的
+    // TODO 本方法未处理缓存穿透和缓存击穿（待后续优化）
+    @Override
+    public Result getLikeNoteByNoteIdAndUserId(Integer noteId, Integer userId) {
+        String key = CACHE_LIKENOTE_NOTE_USER_KEY + noteId + ":" + userId;
+        try{
+            Integer id = hashRedisClient.hMultiGet(key, Integer.class);
+            LikeNote likeNote = null;
+            if (id != null) {
+                likeNote = (LikeNote) this.getLikeNoteById(id).getData();
+            }
+            if (likeNote == null) {
+                likeNote = query().select("id").eq("note_id", noteId)
+                        .eq("user_id", userId).one();
+            }
+            if (likeNote == null) {
+                return Result.fail("该点赞笔记记录不存在");
+            }
+            if (id == null) {
+                hashRedisClient.hMultiSet(key, likeNote.getId());
+                hashRedisClient.expire(key,
+                        CACHE_LIKENOTE_NOTE_USER_TTL, TimeUnit.MINUTES);
+            }
+            return Result.ok(likeNote);
+        } catch (ParseException e) {
+            return Result.fail("获取点赞记录失败");
+        }
+    }
+
     @Override
     @Transactional
     public Result removeLikeNote(Integer id) {
-        if (!removeById(id)) {
-            return Result.fail("删除点赞笔记记录" + id + "失败");
+        LikeNote likeNote = (LikeNote) this.getLikeNoteById(id).getData();
+        if (!this.removeById(id)) {
+            throw new RuntimeException("删除点赞笔记记录" + id + "失败");
         }
         hashRedisClient.delete(CACHE_LIKENOTE_KEY + id);
+        hashRedisClient.delete(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + ":" + likeNote.getUserId());
         return Result.ok();
     }
 
     @Override
     @Transactional
     public Result addLikeNote(LikeNote likeNote) {
-        if (!save(likeNote)) {
-            return Result.fail("添加新的点赞笔记记录失败");
+        if (!this.save(likeNote)) {
+            throw new RuntimeException("添加新的点赞笔记记录失败");
         }
         hashRedisClient.hMultiSet(CACHE_LIKENOTE_KEY + likeNote.getId(), likeNote);
+        hashRedisClient.expire(CACHE_LIKENOTE_KEY + likeNote.getId(), CACHE_LIKENOTE_TTL, TimeUnit.MINUTES);
+        hashRedisClient.hMultiSet(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + " " + likeNote.getUserId(),
+                likeNote);
+        hashRedisClient.expire(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + " " + likeNote.getUserId(),
+                CACHE_LIKENOTE_NOTE_USER_TTL, TimeUnit.MINUTES);
         return Result.ok();
     }
 

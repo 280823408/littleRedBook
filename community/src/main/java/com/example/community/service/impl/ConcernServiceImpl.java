@@ -67,7 +67,7 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
     @Transactional
     public Result removeConcernById(Integer id) {
         if (!removeById(id)) {
-            return Result.fail("删除关注记录" + id + "失败");
+            throw new RuntimeException("删除关注记录" + id + "失败");
         }
         hashRedisClient.delete(CACHE_CONCERN_KEY + id);
         return Result.ok();
@@ -79,7 +79,9 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
         Integer id = baseMapper.selectOne(
                 query().getWrapper().eq("user_id", userId)
                         .eq("fans_id", fansId)).getId();
-        removeById(id);
+        if (!removeById(id)) {
+            throw new RuntimeException("删除关注记录" + id + "失败");
+        }
         hashRedisClient.delete(CACHE_CONCERN_KEY + id);
         return Result.ok();
     }
@@ -88,7 +90,7 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
     @Transactional
     public Result addConcern(Concern concern) {
         if (!save(concern)) {
-            return Result.fail("添加新的关注记录失败");
+            throw new RuntimeException("添加新的关注记录失败");
         }
         hashRedisClient.hMultiSet(CACHE_CONCERN_KEY + concern.getId(), concern);
         return Result.ok();

@@ -107,3 +107,61 @@ public Result addConcern(Concern concern) {
 ```
 假设此时我们采用先存入缓存再写入数据库的情况，那么当concern的`Id`为数据库中的自增字段，那么从前端获取的concern数据中的id
 大概率为空，此时会产生空调用报错，并且写入缓存的数据也为空，从而造成隐患。
+  
+8.在MySQL中使用datetime类型时，需要注意时区的问题，如果计算从数据库中取得的时间和当前系统时间的字符串形式相同的情况下，相差接近
+8个小时时，可能是时区不一致导致的问题。可以通过 `application.properties/yml`调整连接数据库的时区设置或者调整spring处理前端返回
+数据时的时区设置如下所示:
+```java
+spring.datasource.url=jdbc:mysql://localhost:3306/little_red_book?serverTimezone=Asia/Shanghai
+spring.jackson.time-zone=Asia/Shanghai
+```
+  
+9.关于点赞的理解，方便起见为每个存在点赞数统计的实体类均增加了like_num字段及属性，在使用redis缓存时，为了确保点赞业务的一致性。
+需要采用远程调用的方式确保相关点赞记录表和点赞数的同时增加。但针对通过redis缓存操作而言，由于点赞/取消点赞都是需要同时给出 `用户ID`
+和 `点赞数据的ID`（如点赞评论所需的评论ID、点赞笔记所需的笔记ID）。  
+由于先前的缓存只针对了点赞记录本身的ID进行缓存，因此在查询时我们并
+不能通过Redis来优化该查询操作，因此如果存在需求（高并发）应用Redis进行优化的话，我们需要设计二级索引，即除了存入以键值对为<id,likeRecord>
+Hash结构数据外，增加键值对<点赞数据ID + 用户ID, ID>来帮助我们优化该查询。  
+在源代码的基础上，添加方法和删除方法中均增加对于该索引的存储/删除，此外对于删除而言，前端传入的数据为相应的ID，那么我们无法通过其删除索引结构，此时存在
+两种方法。
+```java
+    @Override
+    @Transactional
+    public Result removeLikeNote(Integer id) {
+        if (!removeById(id)) {
+            return Result.fail("删除点赞笔记记录" + id + "失败");
+        }
+        hashRedisClient.delete(CACHE_LIKENOTE_KEY + id);
+        return Result.ok();
+    }
+```
+① 修改传入的数据为likeRecord整体如下所示
+```java
+    @Override
+    @Transactional
+    public Result removeLikeNote(LikeNote likeNote) {
+        Integer id = likeNote.getId(id);
+        if (!removeById(id) {
+            return Result.fail("删除点赞笔记记录" + id + "失败");
+        }
+        hashRedisClient.delete(CACHE_LIKENOTE_KEY + id);
+        hashRedisClient.delete(CACHE_LIKENOTE_NOTE_USER_KEY + likenote.getNoteId() + ":" + likenote.getUserId());
+        return Result.ok();
+    }
+```
+② 通过传入的id再次查询获取likeRecord如下所示
+```java
+    @Override
+    @Transactional
+    public Result removeLikeNote(Integer id) {
+        LikeNote likeNote = (LikeNote) this.getLikeNoteById(id).getData();
+        if (!removeById(id)) {
+            return Result.fail("删除点赞笔记记录" + id + "失败");
+        }
+        hashRedisClient.delete(CACHE_LIKENOTE_KEY + id);
+        hashRedisClient.delete(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + ":" + likeNote.getUserId());
+        return Result.ok();
+    }
+```
+此次采用第一种方式，主要原因在于第二种方式虽然无需改动其他层的代码整体改动小，但会造成需要维护的。或许会好奇这种方式会增加一次查询，是否会导致性能下降/数据库访问压力过大。
+但根据我们的实际应用场景而言，取消点赞操作场景频率通常较低，属于完全可接受的范畴。

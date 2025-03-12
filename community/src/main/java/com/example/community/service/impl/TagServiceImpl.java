@@ -83,7 +83,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
     @Transactional
     public Result addTag(Tag tag) {
         if (!save(tag)) {
-            return Result.fail("添加新标签失败");
+            throw new RuntimeException("添加新标签失败");
         }
         stringRedisClient.delete(CACHE_TAG_KEY + tag.getId());
         return Result.ok();

@@ -7,6 +7,7 @@ import com.example.littleredbook.entity.LikeNote;
 public interface ILikeNoteService extends IService<LikeNote> {
     Result getLikeNoteById(Integer id);
     Result getLikeNotesByNoteId(Integer noteId);
+    Result getLikeNoteByNoteIdAndUserId(Integer noteId, Integer userId);
     Result removeLikeNote(Integer id);
     Result addLikeNote(LikeNote likeNote);
 }
