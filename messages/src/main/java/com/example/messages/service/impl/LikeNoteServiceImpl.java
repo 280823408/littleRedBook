@@ -10,8 +10,10 @@ import com.example.messages.mapper.LikeNoteMapper;
 import com.example.messages.service.ILikeNoteService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -70,16 +72,14 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
                 likeNote = (LikeNote) this.getLikeNoteById(id).getData();
             }
             if (likeNote == null) {
-                likeNote = query().select("id").eq("note_id", noteId)
+                likeNote = query().eq("note_id", noteId)
                         .eq("user_id", userId).one();
             }
             if (likeNote == null) {
                 return Result.fail("该点赞笔记记录不存在");
             }
             if (id == null) {
-                hashRedisClient.hMultiSet(key, likeNote.getId());
-                hashRedisClient.expire(key,
-                        CACHE_LIKENOTE_NOTE_USER_TTL, TimeUnit.MINUTES);
+                hashRedisClient.hSet(key,"id", likeNote.getId(), CACHE_LIKENOTE_NOTE_USER_TTL, TimeUnit.MINUTES);
             }
             return Result.ok(likeNote);
         } catch (ParseException e) {
@@ -88,7 +88,7 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result removeLikeNote(Integer id) {
         LikeNote likeNote = (LikeNote) this.getLikeNoteById(id).getData();
         if (!this.removeById(id)) {
@@ -100,17 +100,16 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result addLikeNote(LikeNote likeNote) {
+        likeNote.setLikeTime(new Timestamp(System.currentTimeMillis()));
         if (!this.save(likeNote)) {
             throw new RuntimeException("添加新的点赞笔记记录失败");
         }
         hashRedisClient.hMultiSet(CACHE_LIKENOTE_KEY + likeNote.getId(), likeNote);
         hashRedisClient.expire(CACHE_LIKENOTE_KEY + likeNote.getId(), CACHE_LIKENOTE_TTL, TimeUnit.MINUTES);
-        hashRedisClient.hMultiSet(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + " " + likeNote.getUserId(),
-                likeNote);
-        hashRedisClient.expire(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + " " + likeNote.getUserId(),
-                CACHE_LIKENOTE_NOTE_USER_TTL, TimeUnit.MINUTES);
+        hashRedisClient.hSet(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + " " + likeNote.getUserId()
+                ,"id", likeNote.getId(), CACHE_LIKENOTE_NOTE_USER_TTL, TimeUnit.MINUTES);
         return Result.ok();
     }
 

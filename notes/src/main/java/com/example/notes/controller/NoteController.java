@@ -35,8 +35,6 @@ import java.text.ParseException;
 public class NoteController {
     @Resource
     private INoteService noteService;
-//    @Resource
-//    private HashRedisClient hashRedisClient;
 
     /**
      * 根据笔记ID获取笔记详情
@@ -44,7 +42,7 @@ public class NoteController {
      * @return Result对象，包含笔记详情或错误信息
      * @throws ParseException 当日期解析异常时抛出
      */
-    @PostMapping("getNoteById")
+    @GetMapping("getNoteById")
     public Result getNoteById(@RequestParam Integer id) throws ParseException {
         return noteService.getNoteById(id);
     }
@@ -54,7 +52,7 @@ public class NoteController {
      * @param userId 用户ID
      * @return Result对象，包含笔记列表或错误信息
      */
-    @PostMapping("getNotesByUserId")
+    @GetMapping("getNotesByUserId")
     public Result getNotesByUserId(@RequestParam Integer userId) {
         return noteService.getNotesByUserId(userId);
     }
@@ -64,7 +62,7 @@ public class NoteController {
      * @param title 笔记标题关键词
      * @return Result对象，包含匹配的笔记列表或错误信息
      */
-    @PostMapping("getNotesByTitle")
+    @GetMapping("getNotesByTitle")
     public Result getNotesByTitle(@RequestParam String title) {
         return noteService.getNotesByTitle(title);
     }
@@ -74,7 +72,7 @@ public class NoteController {
      * @param userId 当前用户ID（用于个性化显示）
      * @return Result对象，包含排序后的笔记列表或错误信息
      */
-    @PostMapping("getAllNotesSortedByLikeNum")
+    @GetMapping("getAllNotesSortedByLikeNum")
     public Result getAllNotesSortedByLikeNum(@RequestParam Integer userId) {
         return noteService.getAllNotesSortedByLikeNum(userId);
     }
@@ -84,7 +82,7 @@ public class NoteController {
      * @param userId 当前用户ID（用于访问控制）
      * @return Result对象，包含按时间排序的笔记列表或错误信息
      */
-    @PostMapping("getAllNotesSortedByCreatTime")
+    @GetMapping("getAllNotesSortedByCreatTime")
     public Result getAllNotesSortedByCreatTime(@RequestParam Integer userId) {
         return noteService.getAllNotesSortedByCreatTime(userId);
     }
@@ -94,7 +92,7 @@ public class NoteController {
      * @param tagId 标签唯一标识
      * @return Result对象，包含该标签下的笔记集合或错误信息
      */
-    @PostMapping("getNotesByTag")
+    @GetMapping("getNotesByTag")
     public Result getNotesByTag(@RequestParam Integer tagId) {
         return noteService.getNotesByTag(tagId);
     }
@@ -117,6 +115,17 @@ public class NoteController {
     @PostMapping("updateNote")
     public Result updateNote(@RequestBody Note note) {
         return noteService.updateNote(note);
+    }
+
+    /**
+     * 点赞/取消点赞笔记
+     * @param id 笔记ID（用于点赞记录）
+     * @param userId 当前用户ID（用于点赞记录）
+     * @return Result对象，包含点赞操作结果或错误信息
+     */
+    @GetMapping("likeNote")
+    public Result likeNote(@RequestParam Integer id, @RequestParam Integer userId) {
+        return noteService.likeNote(id, userId);
     }
 //    /**
 //     * 测试hash结构的redis存储
@@ -142,4 +151,5 @@ public class NoteController {
 //        log.debug(note1.toString());
 //        return Result.ok(note1);
 //    }
+
 }

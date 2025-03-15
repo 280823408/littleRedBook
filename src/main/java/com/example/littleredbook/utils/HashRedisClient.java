@@ -142,6 +142,11 @@ public class HashRedisClient {
      * @param unit 时间单位
      */
     public void hSet(String key, String field, Object value, Long time, TimeUnit unit) {
+        if (isSimpleType(value)) {
+            hashOperations.put(key, field, String.valueOf(value));
+            stringRedisTemplate.expire(key, time, unit);
+            return;
+        }
         hashOperations.put(key, field, JSONUtil.toJsonStr(value));
         stringRedisTemplate.expire(key, time, unit);
     }
@@ -166,20 +171,13 @@ public class HashRedisClient {
         Map<String, String> map = new HashMap<>();
         Field[] fields = bean.getClass().getDeclaredFields();
         for (Field field : fields) {
-            // 跳过JDK内部类的字段
-            Class<?> declaringClass = field.getDeclaringClass();
-            String packageName = declaringClass.getPackageName();
-            if (packageName.startsWith("java.") || packageName.startsWith("sun.")) {
-                log.debug("Skipping JDK internal field: {}", field.getName());
-                continue;
-            }
+            field.setAccessible(true);
             try {
-                field.setAccessible(true);
                 Object obj = field.get(bean);
                 String str = "";
                 if (isSimpleType(obj)) {
                     str = String.valueOf(obj);
-                } else if (obj != null && obj.getClass() == Timestamp.class) {
+                } else  if (obj.getClass() == Timestamp.class){
                     str = DateUtils.TimeStampToString((Timestamp) obj);
                 } else {
                     str = JSONUtil.toJsonStr(obj);
@@ -446,27 +444,31 @@ public class HashRedisClient {
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) throws ParseException {
         String key = keyPrefix + id;
         R result = this.hMultiGet(key, type);
+        boolean isLock = false;
         if (result != null) {
             return result;
         }
         String lockKey = RedisConstants.LOCK_HASH_PREFIX + id;
         RLock lock = redissonClient.getLock(lockKey);
         try {
-            boolean isLock = lock.tryLock(1, 10, TimeUnit.SECONDS);
+            isLock = lock.tryLock(1, 5, TimeUnit.SECONDS);
             if (!isLock) {
                 Thread.sleep(50);
                 return queryWithMutex(keyPrefix, id, type, dbFallback, time, unit);
             }
             result = dbFallback.apply(id);
             if (result == null) {
-                this.hMultiSet(key, "null");
+                this.hMultiSet(key, "");
                 return null;
             }
             this.hMultiSet(key, result);
+            this.expire(key, time, unit);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            if (isLock && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
         return result;
     }

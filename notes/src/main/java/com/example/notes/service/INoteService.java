@@ -80,4 +80,20 @@ public interface INoteService extends IService<Note> {
      * @return Result标准响应（操作结果）
      */
     Result updateNote(Note note);
+
+    /**
+     * 点赞回复评论
+     * @param id 笔记ID
+     * @param userId 用户ID
+     * @return Result标准响应（操作结果）
+     */
+    Result likeNote(Integer id, Integer userId);
+
+    /**
+     * 更新笔记评论点赞数（带缓存失效）
+     * @param id 评论ID
+     * @param isLike 是否点赞
+     * @return Result标准响应（操作结果）
+     */
+    Result updateNoteLikeNum(Integer id, boolean isLike);
 }

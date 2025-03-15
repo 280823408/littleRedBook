@@ -2,20 +2,22 @@ package com.example.notes.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
-import com.example.littleredbook.entity.Note;
-import com.example.littleredbook.entity.Tag;
-import com.example.littleredbook.entity.User;
+import com.example.littleredbook.entity.*;
 import com.example.littleredbook.utils.HashRedisClient;
 import com.example.littleredbook.utils.StringRedisClient;
 import com.example.notes.dto.NoteDTO;
 import com.example.notes.mapper.NoteMapper;
 import com.example.notes.service.INoteService;
+import com.example.notes.utils.MessagesClient;
 import com.example.notes.utils.UserCenterClient;
-import com.example.notes.utils.TagClient;
+import com.example.notes.utils.CommunityClient;
 import jakarta.annotation.Resource;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
@@ -52,11 +54,13 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     @Resource
     private UserCenterClient userCenterClient;
     @Resource
-    private TagClient tagClient;
+    private CommunityClient communityClient;
     @Resource
     private StringRedisClient stringRedisClient;
     @Resource
     private HashRedisClient hashRedisClient;
+    @Resource
+    private MessagesClient messagesClient;
     /**
      * 根据笔记ID查询完整笔记信息
      * @param id 笔记唯一标识
@@ -217,7 +221,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
      */
     @Override
     public Result getNotesByTag(Integer tagId) {
-        Object tagData = tagClient.getNoteIdByTagId(tagId).getData();
+        Object tagData = communityClient.getNoteIdByTagId(tagId).getData();
         List<Integer> noteIds = BeanUtil.copyToList((List<?>) tagData, Integer.class);
         List<NoteDTO> noteDTOS = new ArrayList<>();
         if (noteIds.isEmpty()) {
@@ -275,6 +279,40 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         return Result.ok();
     }
 
+    @Override
+    public Result likeNote(Integer id, Integer userId) {
+        Object likeNoteData =  messagesClient.getLikeNoteByNoteIdAndUserId(
+                id, userId).getData();
+        LikeNote likeNote = BeanUtil.mapToBean((Map<?, ?>) likeNoteData, LikeNote.class, true);
+        boolean isLike = likeNote.getId() != null;
+        INoteService noteService = (INoteService) AopContext.currentProxy();
+        noteService.updateNoteLikeNum(id, isLike);
+        if (isLike) {
+            messagesClient.removeLikeNote(likeNote.getId());
+            hashRedisClient.hIncrement(CACHE_NOTE_KEY + id, "likeNum", -1);
+            hashRedisClient.expire(CACHE_NOTE_KEY + id, CACHE_NOTE_TTL, TimeUnit.MINUTES);
+            return Result.ok();
+        }
+        likeNote.setNoteId(id);
+        likeNote.setUserId(userId);
+        messagesClient.addLikeNote(likeNote);
+        hashRedisClient.hIncrement(CACHE_NOTE_KEY + id, "likeNum", 1);
+        hashRedisClient.expire(CACHE_NOTE_KEY + id, CACHE_NOTE_TTL, TimeUnit.MINUTES);
+        return Result.ok();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Result updateNoteLikeNum(Integer id, boolean isLike) {
+        String sql = isLike ? "like_num = like_num - 1" : "like_num = like_num + 1";
+        if (!update(new LambdaUpdateWrapper<Note>()
+                .eq(Note::getId, id)
+                .setSql(sql))) {
+            throw new RuntimeException("更新评论点赞数失败");
+        }
+        return Result.ok();
+    }
+
     /**
      * 数据库回源方法：组装完整笔记DTO
      * @param id 笔记ID
@@ -287,7 +325,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
             return null;
         }
         Object userData = userCenterClient.getUserById(note.getUserId()).getData();
-        Object tagData = tagClient.getTagsByNoteId(id).getData();
+        Object tagData = communityClient.getTagsByNoteId(id).getData();
         User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
         List<Tag> tags = BeanUtil.copyToList((List<?>) tagData, Tag.class);
         if (user == null) {
@@ -324,7 +362,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         List<NoteDTO> noteDTOs = BeanUtil.copyToList(notes, NoteDTO.class);
         noteDTOs.forEach(noteDTO -> noteDTO.setUser(user));
         noteDTOs.forEach(noteDTO -> {
-          Object tagData = tagClient.getTagsByNoteId(noteDTO.getId()).getData();
+          Object tagData = communityClient.getTagsByNoteId(noteDTO.getId()).getData();
           List<Tag> tags = BeanUtil.copyToList((List<?>) tagData, Tag.class);
           if (tags == null) {
               log.error("标签服务调用失败: noteId={" + noteDTO.getId() + "}");

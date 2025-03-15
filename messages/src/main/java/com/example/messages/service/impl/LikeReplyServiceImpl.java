@@ -11,8 +11,10 @@ import com.example.messages.mapper.LikeReplyMapper;
 import com.example.messages.service.ILikeReplyService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -71,14 +73,14 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
                 likeReply = (LikeReply) this.getLikeReplyById(id).getData();
             }
             if (likeReply == null) {
-                likeReply = query().select("id").eq("reply_id", replyId)
+                likeReply = query().eq("reply_id", replyId)
                         .eq("user_id", userId).one();
             }
             if (likeReply == null) {
                 return Result.fail("该点赞回复评论记录不存在");
             }
             if (id == null) {
-                hashRedisClient.hMultiSet(key, likeReply.getId());
+                hashRedisClient.hSet(key,"id", likeReply.getId(), CACHE_LIKEREPLY_REPLY_USER_TTL, TimeUnit.MINUTES);
                 hashRedisClient.expire(key,
                         CACHE_LIKEREPLY_REPLY_USER_TTL, TimeUnit.MINUTES);
             }
@@ -90,7 +92,7 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result removeLikeReply(Integer id) {
         LikeReply likeReply = (LikeReply) this.getLikeReplyById(id).getData();
         if (!this.removeById(id)) {
@@ -102,17 +104,16 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result addLikeReply(LikeReply likeReply) {
+        likeReply.setLikeTime(new Timestamp(System.currentTimeMillis()));
         if (!this.save(likeReply)) {
             throw new RuntimeException("添加新的点赞回复记录失败");
         }
         hashRedisClient.hMultiSet(CACHE_LIKEREPLY_KEY + likeReply.getId(), likeReply);
         hashRedisClient.expire(CACHE_LIKEREPLY_KEY + likeReply.getId(), CACHE_LIKEREPLY_TTL, TimeUnit.MINUTES);
-        hashRedisClient.hMultiSet(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId(),
-                likeReply);
-        hashRedisClient.expire(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId(),
-                CACHE_LIKEREPLY_REPLY_USER_TTL, TimeUnit.MINUTES);
+        hashRedisClient.hSet(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId()
+                ,"id", likeReply.getId(), CACHE_LIKEREPLY_REPLY_USER_TTL, TimeUnit.MINUTES);
         return Result.ok();
     }
 

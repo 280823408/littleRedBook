@@ -56,7 +56,6 @@ public class LikeCommentController {
 
     /**
      * 查询用户对指定评论的点赞状态
-     * （TODO 待测试接口）
      *
      * @param commentId 目标评论ID
      * @param userId    操作用户ID

@@ -57,7 +57,6 @@ public class LikeReplyController {
 
     /**
      * 查询用户对指定回复的点赞状态
-     * （TODO 待测试接口）
      *
      * @param replyId 目标回复ID
      * @param userId  操作用户ID

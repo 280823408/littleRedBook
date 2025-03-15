@@ -165,3 +165,201 @@ Hash结构数据外，增加键值对<点赞数据ID + 用户ID, ID>来帮助我
 ```
 此次采用第一种方式，主要原因在于第二种方式虽然无需改动其他层的代码整体改动小，但会造成需要维护的。或许会好奇这种方式会增加一次查询，是否会导致性能下降/数据库访问压力过大。
 但根据我们的实际应用场景而言，取消点赞操作场景频率通常较低，属于完全可接受的范畴。
+  
+10.事务嵌套+远程调用+缓存操作导致长事务阻塞问题，进而引发数据库锁未释放造成超时连接。在Spring 事务管理机制下，事务的传播行为和锁持有时间是导致该问题的核心原因。  
+我们先看源代码如下所示：
+```java
+    @Override
+    @Transactional
+    public Result likeNoteComment(NoteComment noteComment, Integer userId) {
+        Object likeCommentData =  messagesClient.getLikeCommentByCommentIdAndUserId(
+                noteComment.getId(), userId).getData();
+        LikeComment likeComment = BeanUtil.mapToBean((Map<?, ?>) likeCommentData, LikeComment.class, true);
+        boolean isLike = likeComment.getId() != null;
+        updateNoteCommentLikeNum(noteComment.getId(), isLike);
+        if (isLike) {
+            messagesClient.removeLikeComment(likeComment.getId());
+            hashRedisClient.hIncrement(CACHE_COMMENT_KEY + noteComment.getId(), "likeNum", -1);
+            hashRedisClient.expire(CACHE_COMMENT_KEY + noteComment.getId(), CACHE_COMMENT_TTL, TimeUnit.MINUTES);
+            return Result.ok();
+        }
+        likeComment.setCommentId(noteComment.getId());
+        likeComment.setUserId(userId);
+        messagesClient.addLikeComment(likeComment);
+        hashRedisClient.hIncrement(CACHE_COMMENT_KEY + noteComment.getId(), "likeNum", 1);
+        hashRedisClient.expire(CACHE_COMMENT_KEY + noteComment.getId(), CACHE_COMMENT_TTL, TimeUnit.MINUTES);
+        return Result.ok();
+    }
+    
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateNoteCommentLikeNum(Integer commentId, boolean isLike) {
+        String sql = isLike ? "like_num = like_num - 1" : "like_num = like_num + 1";
+        if (!update(new LambdaUpdateWrapper<NoteComment>()
+        .eq(NoteComment::getId, commentId)
+        .setSql(sql))) {
+        throw new RuntimeException("更新评论点赞数失败");
+        }
+    }
+
+    // 实际上是messagesClient中的远程调用方法
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Result addLikeComment(LikeComment likeComment) {
+        likeComment.setLikeTime(new Timestamp(System.currentTimeMillis()));
+        if (!this.save(likeComment)) {
+        throw new RuntimeException("添加新的点赞评论记录失败");
+        }
+        hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_KEY + likeComment.getId(), likeComment);
+        hashRedisClient.expire(CACHE_LIKECOMMENT_KEY + likeComment.getId(), CACHE_LIKECOMMENT_TTL, TimeUnit.MINUTES);
+        hashRedisClient.hSet(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId()
+        ,"id", likeComment.getId(), CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
+        return Result.ok();
+    }
+```
+在上述代码中，当外层方法 likeNoteComment 被 @Transactional 注解包裹时，整个方法会在 一个数据库连接 中运行。即使内部方法（如 updateNoteCommentLikeNum）使用 REQUIRES_NEW，Spring 会通过以下方式管理事务：
+- 外层事务（likeNoteComment）会先获取并持有数据库连接。
+- 内部事务（REQUIRES_NEW）会暂时挂起外层事务，开启新事务，但底层仍可能复用同一个数据库连接池中的连接。
+如果内部事务操作涉及同一行数据（如更新 note_comment 表），外层事务未提交时，行锁可能未完全释放，导致后续操作等待。
+
+假设 updateNoteCommentLikeNum 更新了 note_comment 表的某一行，该行的排他锁（X Lock） 会在外层事务提交后才释放。如果外层事务后续还调用了远程服务或其他耗时操作（如 messagesClient.addLikeComment），锁会长时间持有。  
+```mermaid
+sequenceDiagram
+    participant A as likeNoteComment (外层事务)
+    participant B as updateNoteCommentLikeNum (子事务)
+    participant C as addLikeComment (子事务)
+    participant DB as 数据库
+
+    A->>DB: 开启事务，获取连接
+    A->>B: 调用 updateNoteCommentLikeNum
+    B->>DB: 挂起外层事务，开启新事务
+    B->>DB: 执行 UPDATE（加 X 锁）
+    B->>DB: 提交事务（释放 X 锁？不一定！依赖连接管理）
+    A->>C: 调用 addLikeComment
+    C->>DB: 挂起外层事务，开启新事务
+    C->>DB: 执行 INSERT（需要外键检查，尝试加 S 锁）
+    DB-->>C: 发现 X 锁未释放，等待锁...
+    DB-->>C: Lock wait timeout
+```
+因此我们可以知道，具体原因在于 `外层事务未提交时，行锁可能未完全释放，导致后续操作等待。`所以我们的解决方案很简单，去除外层事务即可。
+```java
+    @Override
+    public Result likeNoteComment(NoteComment noteComment, Integer userId) {
+        Object likeCommentData =  messagesClient.getLikeCommentByCommentIdAndUserId(
+                noteComment.getId(), userId).getData();
+        LikeComment likeComment = BeanUtil.mapToBean((Map<?, ?>) likeCommentData, LikeComment.class, true);
+        boolean isLike = likeComment.getId() != null;
+        INoteCommentService noteCommentService = (INoteCommentService) AopContext.currentProxy();
+        noteCommentService.updateNoteCommentLikeNum(noteComment.getId(), isLike);
+        if (isLike) {
+            messagesClient.removeLikeComment(likeComment.getId());
+            hashRedisClient.hIncrement(CACHE_COMMENT_KEY + noteComment.getId(), "likeNum", -1);
+            hashRedisClient.expire(CACHE_COMMENT_KEY + noteComment.getId(), CACHE_COMMENT_TTL, TimeUnit.MINUTES);
+            return Result.ok();
+        }
+        likeComment.setCommentId(noteComment.getId());
+        likeComment.setUserId(userId);
+        messagesClient.addLikeComment(likeComment);
+        hashRedisClient.hIncrement(CACHE_COMMENT_KEY + noteComment.getId(), "likeNum", 1);
+        hashRedisClient.expire(CACHE_COMMENT_KEY + noteComment.getId(), CACHE_COMMENT_TTL, TimeUnit.MINUTES);
+        return Result.ok();
+    }
+    
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateNoteCommentLikeNum(Integer commentId, boolean isLike) {
+        String sql = isLike ? "like_num = like_num - 1" : "like_num = like_num + 1";
+        if (!update(new LambdaUpdateWrapper<NoteComment>()
+        .eq(NoteComment::getId, commentId)
+        .setSql(sql))) {
+        throw new RuntimeException("更新评论点赞数失败");
+        }
+    }
+
+    // 实际上是messagesClient中的远程调用方法
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Result addLikeComment(LikeComment likeComment) {
+        likeComment.setLikeTime(new Timestamp(System.currentTimeMillis()));
+        if (!this.save(likeComment)) {
+        throw new RuntimeException("添加新的点赞评论记录失败");
+        }
+        hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_KEY + likeComment.getId(), likeComment);
+        hashRedisClient.expire(CACHE_LIKECOMMENT_KEY + likeComment.getId(), CACHE_LIKECOMMENT_TTL, TimeUnit.MINUTES);
+        hashRedisClient.hSet(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId()
+        ,"id", likeComment.getId(), CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
+        return Result.ok();
+    }
+```
+移除外层事务注解后：
+- 每个内部方法（如 updateNoteCommentLikeNum）的 REQUIRES_NEW 会直接开启独立事务，使用独立的数据库连接。
+- 更新和插入操作的事务完全独立，锁在子事务提交后立即释放，不再受外层事务影响。
+
+updateNoteCommentLikeNum 的 REQUIRES_NEW 事务会在方法结束时提交，锁立即释放。后续的 addLikeComment 插入操作（尤其是涉及外键检查时）无需等待锁，避免超时。
+```mermaid
+sequenceDiagram
+    participant A as likeNoteComment (无事务)
+    participant B as updateNoteCommentLikeNum (独立事务)
+    participant C as addLikeComment (独立事务)
+    participant DB as 数据库
+
+    A->>B: 调用 updateNoteCommentLikeNum
+    B->>DB: 开启新事务，获取连接1
+    B->>DB: 执行 UPDATE（加 X 锁）
+    B->>DB: 提交事务，释放 X 锁
+    A->>C: 调用 addLikeComment
+    C->>DB: 开启新事务，获取连接2
+    C->>DB: 执行 INSERT（外键检查，加 S 锁成功）
+    C->>DB: 提交事务
+```
+![img.png](img.png)
+此外，我们也能注意到，移除外层事务后，即使子方法使用默认的 REQUIRED，由于外层无事务，每次调用子方法都会新建独立事务，本质上与 REQUIRES_NEW 的效果一致。哪怕另外两个事务采用默认事务传播机制一样不会发送死锁的情况。  
+
+综上所述，我们可以把解决方法具体归类于以下内容。
+
+1. **避免跨操作的长事务(重要)**  
+   移除外层事务注解（`@Transactional`），确保每个数据库操作在独立事务中快速提交，避免长事务持有锁。
+2. **为子方法显式指定独立事务**  
+对关键操作（如更新和插入）使用 `REQUIRES_NEW` 传播级别，强制开启新事务：
+   ```java
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public void updateNoteCommentLikeNum(...) { ... }
+3. **优化外键索引**
+  
+    确保 like_comment 表的 comment_id 字段有索引，加速外键约束检查。
+4. **异步化非核心操作(可选)**  
+将 Redis 缓存操作移到事务外，或通过异步线程执行，减少事务耗时：
+    ```java
+    public Result likeNoteComment(...) {
+    // 同步执行数据库操作
+    updateNoteCommentLikeNum(...);
+    messagesClient.addLikeComment(...);
+    
+        // 异步更新 Redis
+        CompletableFuture.runAsync(() -> {
+            hashRedisClient.hIncrement(...);
+            hashRedisClient.expire(...);
+        });
+        return Result.ok();
+    }
+    ```
+5. **避免跨服务事务(可选)**  
+   若涉及远程调用（如 Feign 调用），改用消息队列实现最终一致性
+    ```java
+    // 发送事务消息到 RocketMQ
+    rocketMQTemplate.sendMessageInTransaction(
+        "like-comment-topic",  // 消息主题
+        MessageBuilder.withPayload(likeComment).build(),  // 消息内容
+        null  // 业务参数
+    );
+    
+    // 消费者端事务监听
+    @RocketMQTransactionListener
+    public class LikeCommentListener {
+        @Transactional(propagation = Propagation.REQUIRES_NEW)
+        public boolean execute(Message msg) {
+            LikeComment likeComment = parsePayload(msg);
+            // 执行插入操作
+            return this.save(likeComment);
+        }
+    }
+    ```

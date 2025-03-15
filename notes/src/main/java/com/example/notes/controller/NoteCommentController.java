@@ -65,13 +65,13 @@ public class NoteCommentController {
 
     /**
      * 用户点赞评论操作
-     * @param noteComment 需要点赞的评论对象（至少包含评论ID）
+     * @param id 评论唯一标识
      * @param userId 进行点赞的用户ID
      * @return 更新后的点赞状态及点赞数Result对象
      */
-    @PostMapping("likeNoteComment")
-    public Result likeNoteComment(@RequestBody NoteComment noteComment, @RequestParam Integer userId) {
-        return noteCommentService.likeNoteComment(noteComment, userId);
+    @GetMapping("likeNoteComment")
+    public Result likeNoteComment(@RequestParam Integer id, @RequestParam Integer userId) {
+        return noteCommentService.likeNoteComment(id, userId);
     }
 
     /**

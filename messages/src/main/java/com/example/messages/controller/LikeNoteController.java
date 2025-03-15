@@ -57,7 +57,6 @@ public class LikeNoteController {
 
     /**
      * 查询用户对指定笔记的点赞状态
-     * （TODO 待测试接口）
      *
      * @param noteId 目标笔记ID
      * @param userId 操作用户ID

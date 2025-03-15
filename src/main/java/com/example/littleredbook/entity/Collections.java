@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.sql.Timestamp;
+
 /**
  * 收藏记录实体类
  */
@@ -25,4 +27,7 @@ public class Collections {
   /** 笔记ID（关联笔记表） */
   @TableField("note_id")
   private Integer noteId;
+  /** 收藏时间 */
+  @TableField("collection_time")
+  private Timestamp collectionTime;
 }

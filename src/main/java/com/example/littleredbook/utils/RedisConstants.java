@@ -57,16 +57,21 @@ public class RedisConstants {
     public static final String CACHE_COMMENT_KEY = "little_red_book:cache:comment:";
     public static final Long CACHE_COMMENT_TTL = 10L;
     public static final String CACHE_COMMENT_NOTE_KEY = "little_red_book:cache:comment:note:";
-    public static final Long CACHE_NOTE_COMMENTS_TTL = 30L;
+    public static final Long CACHE_COMMENT_NOTE_TTL = 30L;
+    public static final String CACHE_REPLYCOMMENT_KEY = "little_red_book:cache:replycomment:";
+    public static final Long CACHE_REPLYCOMMENT_TTL = 10L;
+    public static final String CACHE_REPLYCOMMENT_COMMENT_KEY = "little_red_book:cache:replycomment:note:";
+    public static final Long CACHE_REPLYCOMMENT_COMMENT_TTL = 30L;
+    public static final String CACHE_SEARCH_KEY = "little_red_book:cache:search:";
+    public static final Long CACHE_SEARCH_TTL = 10L;
+    public static final String CACHE_SEARCH_USER_KEY = "little_red_book:cache:search:user:";
+    public static final Long CACHE_SEARCH_USER_TTL = 30L;
     public static final Long CACHE_TAG_TTL = 60L;
     public static final Long CACHE_SHOP_TTL = 30L;
     public static final String CACHE_SHOP_KEY = "cache:shop:";
-
     public static final String CACHE_SHOPTYPE_KEY = "cache:shopType";
-
     public static final String LOCK_SHOP_KEY = "lock:shop:";
     public static final Long LOCK_SHOP_TTL = 10L;
-
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
     public static final String BLOG_LIKED_KEY = "blog:liked:";
     public static final String FEED_KEY = "feed:";

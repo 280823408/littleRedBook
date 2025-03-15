@@ -23,14 +23,12 @@ public class ReplyComment {
   private Integer id;
   @TableField("comment_id")
   private Integer commentId;
-  @TableField("user1_id")
-  private  Integer user1Id;
-  @TableField("user2_id")
-  private  Integer user2Id;
+  @TableField("user_id")
+  private  Integer userId;
   @TableField("like_num")
   private Integer likeNum;
   @TableField("inner_comment")
   private String innerComment;
-  @TableField("comment_time")
-  private Timestamp commentTime;
+  @TableField("reply_time")
+  private Timestamp replyTime;
 }

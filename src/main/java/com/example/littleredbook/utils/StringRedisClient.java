@@ -317,6 +317,7 @@ public class StringRedisClient {
             String keyPrefix, ID id, Class<R> type, Function<ID, R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
         String json = this.get(key);
+        boolean isLock = false;
         if (StrUtil.isNotBlank(json)) {
             return JSONUtil.toBean(json, type);
         }
@@ -327,7 +328,7 @@ public class StringRedisClient {
         RLock lock = redissonClient.getLock(lockKey);
         R result;
         try {
-            boolean isLock = lock.tryLock(1, 10, TimeUnit.SECONDS);
+            isLock = lock.tryLock(1, 5, TimeUnit.SECONDS);
             if (!isLock) {
                 Thread.sleep(50);
                 return queryWithMutex(keyPrefix, id, type, dbFallback, time, unit);
@@ -341,7 +342,9 @@ public class StringRedisClient {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            if (isLock && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
         return result;
     }
@@ -361,6 +364,7 @@ public class StringRedisClient {
     public <R, ID> List<R> queryListWithMutex(String keyPrefix, ID id, Class<R> type, Function<ID, List<R>> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;
         String json = this.get(key);
+        boolean isLock = false;
         if (StrUtil.isNotBlank(json)) {
             return JSONUtil.toList(json, type);
         }
@@ -371,7 +375,7 @@ public class StringRedisClient {
         RLock lock = redissonClient.getLock(lockKey);
         List<R> result;
         try {
-            boolean isLock = lock.tryLock(100, 10, TimeUnit.SECONDS);
+            isLock = lock.tryLock(1, 5, TimeUnit.SECONDS);
             if (!isLock) {
                 Thread.sleep(50);
                 return this.queryListWithMutex(keyPrefix, id, type, dbFallback, time, unit);
@@ -392,7 +396,9 @@ public class StringRedisClient {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            if (isLock && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
         return result;
     }
@@ -413,6 +419,7 @@ public class StringRedisClient {
                                           Integer param1, Integer param2) {
         String key = String.format(keyPattern, param1, param2);
         String json = this.get(key);
+        boolean isLock = false;
         if (StrUtil.isNotBlank(json)) {
             return JSONUtil.toList(json, type);
         }
@@ -423,7 +430,7 @@ public class StringRedisClient {
         RLock lock = redissonClient.getLock(lockKey);
         List<R> result;
         try {
-            boolean isLock = lock.tryLock(100, 10, TimeUnit.SECONDS);
+            isLock = lock.tryLock(1, 5, TimeUnit.SECONDS);
             if (!isLock) {
                 Thread.sleep(50);
                 return queryListWithMutex(keyPattern, type, dbFallback, time, unit, param1, param2);
@@ -444,7 +451,9 @@ public class StringRedisClient {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            if (isLock && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
         return result;
     }

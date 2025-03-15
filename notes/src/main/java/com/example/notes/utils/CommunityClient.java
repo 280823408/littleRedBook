@@ -2,7 +2,7 @@ package com.example.notes.utils;
 
 import com.example.littleredbook.dto.Result;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -22,14 +22,14 @@ import org.springframework.web.bind.annotation.RequestParam;
  * @author Mike
  * @since 2025/3/15
  */
-@FeignClient(name = "community", url = "http://localhost:8100", path = "/tag")
-public interface TagClient {
+@FeignClient(name = "community", url = "http://localhost:8100")
+public interface CommunityClient {
     /**
      * 查询笔记关联标签
      * @param noteId 笔记唯一标识
      * @return Result标准响应（包含List<Tag>或错误信息）
      */
-    @PostMapping("getTagsByNoteId")
+    @GetMapping("/tag/getTagsByNoteId")
     Result getTagsByNoteId(@RequestParam Integer noteId);
 
     /**
@@ -37,6 +37,6 @@ public interface TagClient {
      * @param tagId 标签唯一标识
      * @return Result标准响应（包含List<Integer>笔记ID集合）
      */
-    @PostMapping("getNoteIdByTagId")
+    @GetMapping("/tag/getNoteIdByTagId")
     Result getNoteIdByTagId(@RequestParam Integer tagId);
 }

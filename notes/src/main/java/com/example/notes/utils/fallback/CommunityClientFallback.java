@@ -1,6 +1,7 @@
-package com.example.notes.utils;
+package com.example.notes.utils.fallback;
 
 import com.example.littleredbook.dto.Result;
+import com.example.notes.utils.CommunityClient;
 
 /**
  * 标签服务熔断降级处理类
@@ -19,7 +20,7 @@ import com.example.littleredbook.dto.Result;
  * @author Mike
  * @since 2025/3/15
  */
-public class TagClientFallback implements TagClient {
+public class CommunityClientFallback implements CommunityClient {
     /**
      * 笔记标签查询降级处理
      * @param noteId 笔记唯一标识

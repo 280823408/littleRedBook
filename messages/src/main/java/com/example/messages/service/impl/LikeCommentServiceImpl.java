@@ -12,8 +12,10 @@ import com.example.messages.service.ILikeCommentService;
 import jakarta.annotation.Resource;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +38,7 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
             if (likeComment == null) {
                 return Result.fail("该点赞评论记录ID不存在");
             }
-            hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_KEY + id, LikeComment.class);
+            hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_KEY + id, likeComment);
             hashRedisClient.expire(CACHE_LIKECOMMENT_KEY + id, CACHE_LIKECOMMENT_TTL, TimeUnit.MINUTES);
             return Result.ok(likeComment);
         } catch (ParseException e) {
@@ -72,16 +74,14 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
                 likeComment = (LikeComment) this.getLikeCommentById(id).getData();
             }
             if (likeComment == null) {
-                likeComment = query().select("id").eq("comment_id", commentId)
+                likeComment = query().eq("comment_id", commentId)
                         .eq("user_id", userId).one();
             }
             if (likeComment == null) {
                 return Result.fail("该点赞评论记录不存在");
             }
             if (id == null) {
-                hashRedisClient.hMultiSet(key, likeComment.getId());
-                hashRedisClient.expire(key,
-                        CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
+                hashRedisClient.hSet(key,"id", likeComment.getId(), CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
             }
             return Result.ok(likeComment);
         } catch (ParseException e) {
@@ -90,7 +90,7 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result removeLikeComment(Integer id) {
         LikeComment likeComment = (LikeComment) this.getLikeCommentById(id).getData();
         if (!this.removeById(id)) {
@@ -102,17 +102,16 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result addLikeComment(LikeComment likeComment) {
+        likeComment.setLikeTime(new Timestamp(System.currentTimeMillis()));
         if (!this.save(likeComment)) {
             throw new RuntimeException("添加新的点赞评论记录失败");
         }
         hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_KEY + likeComment.getId(), likeComment);
         hashRedisClient.expire(CACHE_LIKECOMMENT_KEY + likeComment.getId(), CACHE_LIKECOMMENT_TTL, TimeUnit.MINUTES);
-        hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId()
-                , likeComment.getId());
-        hashRedisClient.expire(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId(),
-                CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
+        hashRedisClient.hSet(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId()
+                ,"id", likeComment.getId(), CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
         return Result.ok();
     }
 

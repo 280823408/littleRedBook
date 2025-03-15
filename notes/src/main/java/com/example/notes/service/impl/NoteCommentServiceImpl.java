@@ -1,21 +1,26 @@
 package com.example.notes.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.LikeComment;
 import com.example.littleredbook.entity.NoteComment;
+import com.example.littleredbook.entity.User;
 import com.example.littleredbook.utils.HashRedisClient;
 import com.example.littleredbook.utils.StringRedisClient;
 import com.example.notes.mapper.NoteCommentMapper;
 import com.example.notes.service.INoteCommentService;
-import com.example.notes.utils.LikeCommentClient;
+import com.example.notes.utils.MessagesClient;
 import jakarta.annotation.Resource;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static com.example.littleredbook.utils.RedisConstants.*;
@@ -27,7 +32,7 @@ public class NoteCommentServiceImpl extends ServiceImpl<NoteCommentMapper, NoteC
     @Resource
     private HashRedisClient hashRedisClient;
     @Resource
-    private LikeCommentClient likeCommentClient;
+    private MessagesClient messagesClient;
     @Override
     public Result getNoteCommentById(Integer id) {
         try {
@@ -53,7 +58,7 @@ public class NoteCommentServiceImpl extends ServiceImpl<NoteCommentMapper, NoteC
                 noteId,
                 NoteComment.class,
                 this::getCommentsByNoteIdFromDB,
-                CACHE_NOTE_COMMENTS_TTL,
+                CACHE_COMMENT_NOTE_TTL,
                 TimeUnit.MINUTES
         );
         if (comments == null) {
@@ -85,36 +90,41 @@ public class NoteCommentServiceImpl extends ServiceImpl<NoteCommentMapper, NoteC
 
     /**
      * 规范代码示范
-     * @param noteComment noteComment实体
+     * @param id 评论ID
      * @param userId 用户ID
      * @return 操作结果
      */
     @Override
-    @Transactional
-    public Result likeNoteComment(NoteComment noteComment, Integer userId) {
-        String sql = "like_num = like_num + 1";
-        int delta = 1;
-        LikeComment likeComment = (LikeComment) likeCommentClient.getLikeCommentByCommentIdAndUserId(
-                noteComment.getId(), userId).getData();
-        if (likeComment != null) {
-            sql = "like_num = like_num - 1";
-            delta = -1;
-        }
-        if (!update(new LambdaUpdateWrapper<NoteComment>()
-                .eq(NoteComment::getId, noteComment.getId())
-                .setSql(sql))) {
-            throw new RuntimeException("点赞该评论失败");
-        }
-        if (likeComment != null) {
-            likeCommentClient.removeLikeComment(likeComment.getId());
-            hashRedisClient.hIncrement(CACHE_COMMENT_KEY + noteComment.getId(), "likeNum", delta);
+    public Result likeNoteComment(Integer id, Integer userId) {
+        Object likeCommentData =  messagesClient.getLikeCommentByCommentIdAndUserId(
+                id, userId).getData();
+        LikeComment likeComment = BeanUtil.mapToBean((Map<?, ?>) likeCommentData, LikeComment.class, true);
+        boolean isLike = likeComment.getId() != null;
+        INoteCommentService noteCommentService = (INoteCommentService) AopContext.currentProxy();
+        noteCommentService.updateNoteCommentLikeNum(id, isLike);
+        if (isLike) {
+            messagesClient.removeLikeComment(likeComment.getId());
+            hashRedisClient.hIncrement(CACHE_COMMENT_KEY + id, "likeNum", -1);
+            hashRedisClient.expire(CACHE_COMMENT_KEY + id, CACHE_COMMENT_TTL, TimeUnit.MINUTES);
             return Result.ok();
         }
-        likeComment = new LikeComment();
-        likeComment.setCommentId(noteComment.getId());
+        likeComment.setCommentId(id);
         likeComment.setUserId(userId);
-        likeCommentClient.addLikeComment(likeComment);
-        hashRedisClient.hIncrement(CACHE_COMMENT_KEY + noteComment.getId(), "likeNum", delta);
+        messagesClient.addLikeComment(likeComment);
+        hashRedisClient.hIncrement(CACHE_COMMENT_KEY + id, "likeNum", 1);
+        hashRedisClient.expire(CACHE_COMMENT_KEY + id, CACHE_COMMENT_TTL, TimeUnit.MINUTES);
+        return Result.ok();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Result updateNoteCommentLikeNum(Integer id, boolean isLike) {
+        String sql = isLike ? "like_num = like_num - 1" : "like_num = like_num + 1";
+        if (!update(new LambdaUpdateWrapper<NoteComment>()
+                .eq(NoteComment::getId, id)
+                .setSql(sql))) {
+            throw new RuntimeException("更新评论点赞数失败");
+        }
         return Result.ok();
     }
 

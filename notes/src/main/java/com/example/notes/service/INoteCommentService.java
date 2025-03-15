@@ -9,5 +9,6 @@ public interface INoteCommentService extends IService<NoteComment> {
     Result getNoteCommentsByNoteId(Integer noteId);
     Result addNoteComment(NoteComment noteComment);
     Result removeNoteComment(Integer id);
-    Result likeNoteComment(NoteComment noteComment, Integer userId);
+    Result likeNoteComment(Integer id, Integer userId);
+    Result updateNoteCommentLikeNum(Integer id, boolean isLike);
 }
