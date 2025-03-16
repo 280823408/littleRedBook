@@ -127,29 +127,4 @@ public class NoteController {
     public Result likeNote(@RequestParam Integer id, @RequestParam Integer userId) {
         return noteService.likeNote(id, userId);
     }
-//    /**
-//     * 测试hash结构的redis存储
-//     */
-//    @PostMapping("test")
-//    public Result test() throws ParseException {
-//        User user = new User();
-//        user.setId(1);
-//        user.setUserName("test");
-//        user.setUserPassword("123456");
-//        user.setPhone("12345678901");
-//        NoteDTO note = new NoteDTO();
-//        note.setId(1);
-//        note.setUser(user);
-//        note.setTitle("test");
-//        note.setContent("test");
-//        List<Tag> tags = new ArrayList<>();
-//        tags.add(new Tag(1,"11"));
-//        note.setTags(tags);
-//        note.setCreateTime(Timestamp.valueOf(LocalDateTime.now()));
-//        hashRedisClient.hMultiSet("test",note);
-//        NoteDTO note1 = hashRedisClient.hMultiGet("test", NoteDTO.class);
-//        log.debug(note1.toString());
-//        return Result.ok(note1);
-//    }
-
 }

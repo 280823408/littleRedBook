@@ -24,6 +24,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Redis哈希结构操作增强客户端
+ *
+ * <p>功能说明：
+ * 1. 提供类型安全的哈希结构操作封装<br>
+ * 2. 实现复杂对象与Redis存储的结构化转换<br>
+ * 3. 集成分布式锁保障缓存重建原子性<br>
+ * 4. 支持逻辑过期时间维护热点数据<br>
+ * 5. 内置缓存穿透保护机制<br>
+ *
+ * <p>典型场景：
+ * - 对象属性级缓存读写操作<br>
+ * - 高并发场景下的缓存击穿防护<br>
+ * - 分布式环境缓存一致性维护<br>
+ * - 动态字段映射的领域对象存储<br>
+ *
+ * @author Mike
+ * @since 2025/2/28
+ */
 @Slf4j
 @Component
 public class HashRedisClient {
@@ -472,5 +491,4 @@ public class HashRedisClient {
         }
         return result;
     }
-
 }

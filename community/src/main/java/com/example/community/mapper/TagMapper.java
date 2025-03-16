@@ -3,6 +3,7 @@ package com.example.community.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.Tag;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
@@ -25,17 +26,26 @@ import java.util.List;
 public interface TagMapper extends BaseMapper<Tag> {
     /**
      * 根据笔记ID查询关联的标签列表
-     * @param noteId
-     * @return
+     * @param noteId 笔记ID
+     * @return 标签列表
      */
     @Select("SELECT * FROM tag JOIN tag_note ON tag.id = tag_note.tag_id WHERE tag_note.note_id = #{noteId}")
     List<Tag> selectTagsByNoteId(Integer noteId);
 
     /**
      * 根据标签ID查询关联的笔记ID列表
-     * @param tagId
-     * @return
+     * @param tagId 标签ID
+     * @return 笔记ID列表
      */
     @Select("SELECT note_id FROM tag_note WHERE tag_id = #{tagId}")
     List<Integer> selectNoteIdByTagId(Integer tagId);
+
+    /**
+     * 添加笔记和标签的关联关系
+     * @param tagId 标签ID
+     * @param noteId 笔记ID
+     * @return 添加结果
+     */
+    @Insert("INSERT INTO tag_note VALUES (null,#{tagId},#{noteId})")
+    boolean insertNoteTag(Integer tagId, Integer noteId);
 }

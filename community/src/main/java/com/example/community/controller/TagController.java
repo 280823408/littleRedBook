@@ -6,6 +6,7 @@ import com.example.littleredbook.entity.Tag;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+
 /**
  * 标签功能控制器
  *
@@ -93,7 +94,7 @@ public class TagController {
      * @param noteId 笔记ID
      * @return 关联操作结果的Result对象
      */
-    @PostMapping("addNoteTag")
+    @GetMapping("addNoteTag")
     public Result addNoteTag(@RequestParam Integer tagId, @RequestParam Integer noteId) {
         return tagService.addNoteTag(tagId, noteId);
     }

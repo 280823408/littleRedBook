@@ -22,6 +22,26 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Redis字符串操作增强客户端
+ *
+ * <p>功能说明：
+ * 1. 封装String数据结构的核心操作<br>
+ * 2. 实现对象自动序列化与反序列化<br>
+ * 3. 集成缓存穿透/雪崩/击穿防护策略<br>
+ * 4. 支持逻辑过期时间维护热点数据<br>
+ * 5. 提供分布式环境下的互斥锁机制<br>
+ *
+ * <p>典型场景：
+ * - 用户会话状态管理<br>
+ * - 热点数据缓存加速<br>
+ * - 分布式原子计数器实现<br>
+ * - 系统配置项集中存储<br>
+ * - 高并发查询请求防护<br>
+ *
+ * @author Mike
+ * @since 2025/2/25
+ */
 @Slf4j
 @Component
 public class StringRedisClient {
@@ -457,5 +477,4 @@ public class StringRedisClient {
         }
         return result;
     }
-
 }

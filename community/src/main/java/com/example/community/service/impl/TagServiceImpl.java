@@ -90,7 +90,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
     }
 
     /**
-     * 获取指定笔记关联的所有标签（待实现）
+     * 获取指定笔记关联的所有标签
      * @param noteId 笔记唯一标识
      * @return 待实现的Result对象
      */
@@ -113,7 +113,6 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements ITagS
     @Override
     @Transactional
     public Result addNoteTag(Integer tagId, Integer noteId) {
-        // TODO: 实现标签与笔记关联关系存储
-        return Result.fail("功能暂未开放");
+        return Result.ok(baseMapper.insertNoteTag(tagId, noteId));
     }
 }

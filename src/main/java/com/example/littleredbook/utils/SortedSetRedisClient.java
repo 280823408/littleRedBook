@@ -19,6 +19,26 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Redis有序集合操作增强客户端
+ *
+ * <p>功能说明：
+ * 1. 封装ZSet数据结构的核心操作<br>
+ * 2. 实现带分数排序的业务场景支持<br>
+ * 3. 集成分布式锁保障缓存重建安全<br>
+ * 4. 支持对象自动序列化与反序列化<br>
+ * 5. 提供缓存穿透保护机制<br>
+ *
+ * <p>典型场景：
+ * - 实时排行榜数据维护<br>
+ * - 时间轴/分数范围查询<br>
+ * - 延迟任务队列实现<br>
+ * - 热点数据排序缓存<br>
+ * - 分布式会话管理<br>
+ *
+ * @author Mike
+ * @since 2025/3/1
+ */
 @Slf4j
 @Component
 public class SortedSetRedisClient {

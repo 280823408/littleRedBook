@@ -20,12 +20,37 @@ import java.util.concurrent.TimeUnit;
 
 import static com.example.littleredbook.utils.RedisConstants.*;
 
+/**
+ * 私信服务实现类
+ *
+ * <p>功能说明：
+ * 1. 实现用户私信核心业务逻辑<br>
+ * 2. 整合MyBatis-Plus完成数据持久化操作<br>
+ * 3. 使用Redis Hash结构缓存单条私信记录<br>
+ * 4. 提供私信查询、撤回、批量删除等管理功能<br>
+ * 5. 事务注解保障敏感操作原子性<br>
+ *
+ * <p>关键特性：
+ * - 带时效的消息撤回机制<br>
+ * - 会话维度的消息列表缓存查询<br>
+ * - 双删策略维护缓存一致性<br>
+ * - 时间区间批量删除服务<br>
+ *
+ * @author Mike
+ * @since 2025/3/9
+ */
 @Service
 public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> implements IMessageService {
     @Resource
     private StringRedisClient stringRedisClient;
     @Resource
     private HashRedisClient hashRedisClient;
+
+    /**
+     * 根据ID查询私信详情
+     * @param id 私信记录唯一标识
+     * @return 包含私信实体或错误信息的Result对象
+     */
     @Override
     public Result getMessageById(Integer id) {
         try {
@@ -44,6 +69,12 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         }
     }
 
+    /**
+     * 获取会话消息列表（双向查询）
+     * @param sendId 发送方ID
+     * @param receiverId 接收方ID
+     * @return 按发送时间倒序排列的私信集合
+     */
     @Override
     public Result getMessagesBySenderIdAndReceiverIdOrderBySendTime(Integer sendId, Integer receiverId) {
         List<Message> messages = stringRedisClient.queryListWithMutex(
@@ -53,7 +84,6 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
                 CACHE_MESSAGE_SENDERANDRECEIVER_TTL,
                 TimeUnit.MINUTES,
                 sendId, receiverId
-
         );
         if (messages == null) {
             return Result.fail("获取私信列表失败");
@@ -61,6 +91,11 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         return Result.ok(messages);
     }
 
+    /**
+     * 时效性消息撤回（10分钟内有效）
+     * @param message 待撤回私信实体
+     * @return 操作结果
+     */
     @Override
     @Transactional
     public Result revokeMessageInLimitTime(Message message) {
@@ -74,6 +109,11 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         return Result.ok();
     }
 
+    /**
+     * 删除指定私信记录
+     * @param id 私信唯一标识
+     * @return 操作结果
+     */
     @Override
     @Transactional
     public Result removeMessage(Integer id) {
@@ -84,6 +124,11 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         return Result.ok();
     }
 
+    /**
+     * 批量删除私信记录
+     * @param ids 私信ID集合
+     * @return 操作结果
+     */
     @Override
     @Transactional
     public Result removeMessages(List<Integer> ids) {
@@ -95,6 +140,14 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         return Result.ok();
     }
 
+    /**
+     * 删除时间区间内的私信记录
+     * @param senderId 发送方ID
+     * @param receiverId 接收方ID
+     * @param startTime 起始时间
+     * @param endTime 结束时间
+     * @return 操作结果
+     */
     @Override
     @Transactional
     public Result removeMessagesInTimeInterval(Integer senderId, Integer receiverId,Timestamp startTime, Timestamp endTime) {
@@ -107,6 +160,11 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         return Result.ok();
     }
 
+    /**
+     * 创建新私信记录
+     * @param message 私信实体对象
+     * @return 操作结果
+     */
     @Override
     @Transactional
     public Result addMessage(Message message) {
@@ -118,8 +176,15 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         return Result.ok();
     }
 
+    /**
+     * 数据库回源查询方法（会话维度）
+     * @param sendId 发送方ID
+     * @param receiverId 接收方ID
+     * @return 双向会话消息列表
+     */
     private List<Message> getMessagesFromDB(Integer sendId, Integer receiverId) {
-        List<Message> messageList = list(query().getWrapper().and(qw -> qw.eq("sender_id", sendId).eq("receiver_id", receiverId))
+        List<Message> messageList = list(query().getWrapper()
+                .and(qw -> qw.eq("sender_id", sendId).eq("receiver_id", receiverId))
                 .or(qw -> qw.eq("sender_id", receiverId).eq("receiver_id", sendId))
                 .orderByDesc("send_time"));
         if (messageList.isEmpty()) {

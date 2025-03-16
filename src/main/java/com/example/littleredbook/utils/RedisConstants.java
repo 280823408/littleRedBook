@@ -1,5 +1,24 @@
 package com.example.littleredbook.utils;
 
+/**
+ * Redis键常量配置中心
+ *
+ * <p>功能说明：
+ * 1. 统一管理系统Redis键命名规范<br>
+ * 2. 集中管理缓存过期时间策略<br>
+ * 3. 提供跨模块键名访问统一入口<br>
+ * 4. 防止键名冲突维护存储一致性<br>
+ *
+ * <p>典型场景：
+ * - 用户登录状态令牌管理<br>
+ * - 热点数据缓存策略控制<br>
+ * - 分布式锁键名生成<br>
+ * - 点赞/收藏等互动行为计数<br>
+ * - 消息/评论二级缓存管理<br>
+ *
+ * @author Mike
+ * @since 2025/2/23
+ */
 public class RedisConstants {
     public static final String LOGIN_CODE_KEY = "little_red_book:login:code:";
     public static final Long LOGIN_CODE_TTL = 2L;

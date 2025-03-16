@@ -3,7 +3,6 @@ package com.example.search.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
-import com.example.littleredbook.entity.BrowseRecord;
 import com.example.littleredbook.entity.SearchRecord;
 import com.example.littleredbook.utils.HashRedisClient;
 import com.example.littleredbook.utils.StringRedisClient;
@@ -20,12 +19,37 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static com.example.littleredbook.utils.RedisConstants.*;
+/**
+ * 搜索记录服务实现类
+ *
+ * <p>功能说明：
+ * 1. 实现用户搜索记录核心业务逻辑<br>
+ * 2. 整合MyBatis-Plus完成数据持久化操作<br>
+ * 3. 使用Redis Hash结构缓存单条搜索记录<br>
+ * 4. 提供搜索记录查询、新增、批量删除等服务<br>
+ * 5. 事务注解保障数据库操作原子性<br>
+ *
+ * <p>关键方法：
+ * - ID/用户维度记录查询<br>
+ * - 批量删除操作的缓存清理<br>
+ * - 带互斥锁的列表缓存查询<br>
+ * - 自动记录搜索时间戳<br>
+ *
+ * @author Mike
+ * @since 2025/3/15
+ */
 @Service
-public class SearchRecordServiceImplService extends ServiceImpl<SearchRecordMapper, SearchRecord> implements ISearchRecordService {
+public class SearchRecordServiceImp extends ServiceImpl<SearchRecordMapper, SearchRecord> implements ISearchRecordService {
     @Resource
     private StringRedisClient stringRedisClient;
     @Resource
     private HashRedisClient hashRedisClient;
+
+    /**
+     * 根据ID查询搜索记录详情
+     * @param id 搜索记录唯一标识
+     * @return 包含搜索实体或错误信息的Result对象
+     */
     @Override
     public Result getSearchRecordById(Integer id) {
         try {
@@ -36,7 +60,7 @@ public class SearchRecordServiceImplService extends ServiceImpl<SearchRecordMapp
             if (searchRecord == null) {
                 return Result.fail("该搜索记录ID不存在");
             }
-            hashRedisClient.hMultiSet(CACHE_SEARCH_KEY + id, BrowseRecord.class);
+            hashRedisClient.hMultiSet(CACHE_SEARCH_KEY + id, SearchRecord.class);
             hashRedisClient.expire(CACHE_SEARCH_KEY + id, CACHE_SEARCH_TTL, TimeUnit.MINUTES);
             return Result.ok(searchRecord);
         } catch (ParseException e) {
@@ -44,6 +68,11 @@ public class SearchRecordServiceImplService extends ServiceImpl<SearchRecordMapp
         }
     }
 
+    /**
+     * 获取用户所有搜索记录
+     * @param userId 用户唯一标识
+     * @return 包含搜索记录集合的Result对象
+     */
     @Override
     public Result getSearchRecordsByUserId(Integer userId) {
         List<SearchRecord> searchRecords = stringRedisClient.queryListWithMutex(
@@ -60,6 +89,11 @@ public class SearchRecordServiceImplService extends ServiceImpl<SearchRecordMapp
         return Result.ok(searchRecords);
     }
 
+    /**
+     * 清空用户搜索记录
+     * @param userId 用户唯一标识
+     * @return 操作结果的Result对象
+     */
     @Override
     @Transactional
     public Result removeSearchRecordsByUserId(Integer userId) {
@@ -71,6 +105,11 @@ public class SearchRecordServiceImplService extends ServiceImpl<SearchRecordMapp
         return Result.ok();
     }
 
+    /**
+     * 删除指定搜索记录
+     * @param id 记录唯一标识
+     * @return 操作结果的Result对象
+     */
     @Override
     @Transactional
     public Result removeSearchRecord(Integer id) {
@@ -81,6 +120,11 @@ public class SearchRecordServiceImplService extends ServiceImpl<SearchRecordMapp
         return Result.ok();
     }
 
+    /**
+     * 创建新的搜索记录
+     * @param searchRecord 搜索记录实体
+     * @return 操作结果的Result对象
+     */
     @Override
     @Transactional
     public Result addSearchRecord(SearchRecord searchRecord) {
@@ -93,9 +137,9 @@ public class SearchRecordServiceImplService extends ServiceImpl<SearchRecordMapp
     }
 
     /**
-     * 数据库回源方法
-     * @param userId 用户id
-     * @return 搜索记录列表
+     * 数据库回源方法（用户维度）
+     * @param userId 用户唯一标识
+     * @return 搜索记录空集合或数据集合
      */
     private List<SearchRecord> getSearchRecordFromDBForUserId(Integer userId) {
         List<SearchRecord> searchRecords = list(new QueryWrapper<SearchRecord>().eq("user_id", userId));

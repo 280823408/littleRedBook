@@ -3,14 +3,12 @@ package com.example.messages.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
-import com.example.littleredbook.entity.Concern;
 import com.example.littleredbook.entity.LikeComment;
 import com.example.littleredbook.utils.HashRedisClient;
 import com.example.littleredbook.utils.StringRedisClient;
 import com.example.messages.mapper.LikeCommentMapper;
 import com.example.messages.service.ILikeCommentService;
 import jakarta.annotation.Resource;
-import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,12 +20,37 @@ import java.util.concurrent.TimeUnit;
 
 import static com.example.littleredbook.utils.RedisConstants.*;
 
+/**
+ * 评论点赞服务实现类
+ *
+ * <p>功能说明：
+ * 1. 实现评论点赞关系核心业务逻辑<br>
+ * 2. 整合MyBatis-Plus完成数据持久化操作<br>
+ * 3. 使用Redis Hash结构缓存点赞记录<br>
+ * 4. 设计复合键二级索引优化联合查询<br>
+ * 5. 事务注解保障数据操作原子性<br>
+ *
+ * <p>关键特性：
+ * - 主记录缓存与二级索引同步维护<br>
+ * - 带互斥锁的列表缓存查询机制<br>
+ * - 双删策略保障缓存一致性<br>
+ * - 时间维度数据自动生成<br>
+ *
+ * @author Mike
+ * @since 2025/3/9
+ */
 @Service
 public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeComment> implements ILikeCommentService {
     @Resource
     private StringRedisClient stringRedisClient;
     @Resource
     private HashRedisClient hashRedisClient;
+
+    /**
+     * 根据主键查询点赞记录
+     * @param id 点赞记录唯一标识
+     * @return 包含点赞实体或错误信息的Result对象
+     */
     @Override
     public Result getLikeCommentById(Integer id) {
         try {
@@ -46,6 +69,11 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
         }
     }
 
+    /**
+     * 获取评论所有点赞记录
+     * @param commentId 被点赞评论ID
+     * @return 包含点赞集合的Result对象
+     */
     @Override
     public Result getLikeCommentsByCommentId(Integer commentId) {
         List<LikeComment> likeCommentList = stringRedisClient.queryListWithMutex(
@@ -62,6 +90,12 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
         return Result.ok(likeCommentList);
     }
 
+    /**
+     * 联合查询用户对评论的点赞状态
+     * @param commentId 目标评论ID
+     * @param userId 查询用户ID
+     * @return 包含点赞记录的Result对象
+     */
     // TODO 可以在Redis中设计LikeComment的二级索引，即通过commentId+userId -> id的映射关系，从而达到使用Redis优化查询的目的
     // TODO 本方法未处理缓存穿透和缓存击穿（待后续优化）
     @Override
@@ -89,6 +123,11 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
         }
     }
 
+    /**
+     * 删除点赞记录
+     * @param id 点赞记录主键
+     * @return 操作结果
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result removeLikeComment(Integer id) {
@@ -101,6 +140,11 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
         return Result.ok();
     }
 
+    /**
+     * 创建新的点赞记录
+     * @param likeComment 点赞实体对象
+     * @return 操作结果
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result addLikeComment(LikeComment likeComment) {
@@ -115,6 +159,11 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
         return Result.ok();
     }
 
+    /**
+     * 数据库回源查询方法
+     * @param commentId 目标评论ID
+     * @return 点赞记录集合
+     */
     private List<LikeComment> getLikeCommentsFromDBForCommentId(Integer commentId) {
         List<LikeComment> likeCommentList = list(new QueryWrapper<LikeComment>().eq("comment_id", commentId));
         if (likeCommentList.isEmpty()) {

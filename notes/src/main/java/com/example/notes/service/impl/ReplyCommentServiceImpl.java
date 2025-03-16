@@ -4,9 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
-import com.example.littleredbook.entity.LikeComment;
 import com.example.littleredbook.entity.LikeReply;
-import com.example.littleredbook.entity.NoteComment;
 import com.example.littleredbook.entity.ReplyComment;
 import com.example.littleredbook.utils.HashRedisClient;
 import com.example.littleredbook.utils.StringRedisClient;
@@ -26,6 +24,25 @@ import java.util.concurrent.TimeUnit;
 
 import static com.example.littleredbook.utils.RedisConstants.*;
 
+/**
+ * 回复评论服务实现类
+ *
+ * <p>功能说明：
+ * 1. 实现评论回复关系核心业务逻辑<br>
+ * 2. 整合MyBatis-Plus完成数据持久化操作<br>
+ * 3. 使用Redis Hash结构缓存单条回复记录<br>
+ * 4. 提供回复查询、新增、删除及点赞功能<br>
+ * 5. 事务注解保障数据库操作原子性<br>
+ *
+ * <p>关键方法：
+ * - ID/评论维度回复查询<br>
+ * - 带互斥锁的列表缓存查询<br>
+ * - 点赞操作的缓存与数据库双写<br>
+ * - 独立事务更新点赞计数器<br>
+ *
+ * @author Mike
+ * @since 2025/3/14
+ */
 @Service
 public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, ReplyComment> implements IReplyCommentService {
     @Resource
@@ -35,6 +52,11 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
     @Resource
     private MessagesClient messagesClient;
 
+    /**
+     * 根据ID查询回复评论详情
+     * @param id 回复记录唯一标识
+     * @return 包含回复实体或错误信息的Result对象
+     */
     @Override
     public Result getReplyCommentById(Integer id) {
         try {
@@ -53,6 +75,11 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         }
     }
 
+    /**
+     * 获取指定评论的回复列表
+     * @param commentId 父评论唯一标识
+     * @return 包含回复集合的Result对象
+     */
     @Override
     public Result getReplyCommentsByCommentId(Integer commentId) {
         List<ReplyComment> replyComments = stringRedisClient.queryListWithMutex(
@@ -69,6 +96,11 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         return Result.ok(replyComments);
     }
 
+    /**
+     * 新增回复评论记录
+     * @param replyComment 回复实体对象
+     * @return 操作结果的Result对象
+     */
     @Override
     @Transactional
     public Result addReplyComment(ReplyComment replyComment) {
@@ -80,6 +112,11 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         return Result.ok();
     }
 
+    /**
+     * 删除回复评论记录
+     * @param id 回复记录唯一标识
+     * @return 操作结果的Result对象
+     */
     @Override
     @Transactional
     public Result removeReplyComment(Integer id) {
@@ -90,6 +127,12 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         return Result.ok();
     }
 
+    /**
+     * 处理用户点赞回复操作
+     * @param id 回复记录唯一标识
+     * @param userId 用户唯一标识
+     * @return 操作结果的Result对象
+     */
     @Override
     public Result likeReplyComment(Integer id, Integer userId) {
         Object likeReplyData =  messagesClient.getLikeReplyByReplyIdAndUserId(
@@ -112,6 +155,12 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         return Result.ok();
     }
 
+    /**
+     * 更新回复点赞计数器
+     * @param id 回复记录唯一标识
+     * @param isLike 是否取消点赞
+     * @return 操作结果的Result对象
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result updateReplyCommentLikeNum(Integer id, boolean isLike) {
@@ -125,7 +174,9 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
     }
 
     /**
-     * 从数据库查询指定评论的回复评论列表（按时间倒序）
+     * 从数据库查询评论回复列表
+     * @param commentId 父评论唯一标识
+     * @return 按时间倒序排列的回复集合
      */
     private List<ReplyComment> getReplyCommentsByCommentIdFromDB(Integer commentId) {
         List<ReplyComment> replyCommentList = query().eq("comment_id", commentId)

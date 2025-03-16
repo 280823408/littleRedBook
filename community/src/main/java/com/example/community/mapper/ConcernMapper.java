@@ -2,6 +2,7 @@ package com.example.community.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.example.littleredbook.entity.Concern;
+
 /**
  * 用户关注关系数据访问层接口
  *
