@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.*;
 import com.example.littleredbook.utils.HashRedisClient;
+import com.example.littleredbook.utils.MQClient;
 import com.example.littleredbook.utils.StringRedisClient;
 import com.example.notes.dto.NoteDTO;
 import com.example.notes.mapper.NoteMapper;
@@ -61,6 +62,8 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     private HashRedisClient hashRedisClient;
     @Resource
     private MessagesClient messagesClient;
+    @Resource
+    private MQClient mqClient;
     /**
      * 根据笔记ID查询完整笔记信息
      * @param id 笔记唯一标识

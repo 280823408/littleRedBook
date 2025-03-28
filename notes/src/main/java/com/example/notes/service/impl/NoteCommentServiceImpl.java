@@ -6,9 +6,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.LikeComment;
 import com.example.littleredbook.entity.NoteComment;
-import com.example.littleredbook.entity.User;
 import com.example.littleredbook.utils.HashRedisClient;
+import com.example.littleredbook.utils.MQClient;
 import com.example.littleredbook.utils.StringRedisClient;
+import com.example.notes.dto.LikeMessage;
 import com.example.notes.mapper.NoteCommentMapper;
 import com.example.notes.service.INoteCommentService;
 import com.example.notes.utils.MessagesClient;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
 
 /**
@@ -52,6 +54,8 @@ public class NoteCommentServiceImpl extends ServiceImpl<NoteCommentMapper, NoteC
     private HashRedisClient hashRedisClient;
     @Resource
     private MessagesClient messagesClient;
+    @Resource
+    private MQClient mqClient;
 
     /**
      * 根据评论ID查询详细信息
@@ -143,16 +147,14 @@ public class NoteCommentServiceImpl extends ServiceImpl<NoteCommentMapper, NoteC
         INoteCommentService noteCommentService = (INoteCommentService) AopContext.currentProxy();
         noteCommentService.updateNoteCommentLikeNum(id, isLike);
         if (isLike) {
-            messagesClient.removeLikeComment(likeComment.getId());
-            hashRedisClient.hIncrement(CACHE_COMMENT_KEY + id, "likeNum", -1);
-            hashRedisClient.expire(CACHE_COMMENT_KEY + id, CACHE_COMMENT_TTL, TimeUnit.MINUTES);
+            mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKECOMMENT_QUEUE_ROUTING_KEY, likeComment);
+            mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_COMMENT_CACHE_QUEUE_ROUTING_KEY, new LikeMessage(id, -1), 100);
             return Result.ok();
         }
         likeComment.setCommentId(id);
         likeComment.setUserId(userId);
-        messagesClient.addLikeComment(likeComment);
-        hashRedisClient.hIncrement(CACHE_COMMENT_KEY + id, "likeNum", 1);
-        hashRedisClient.expire(CACHE_COMMENT_KEY + id, CACHE_COMMENT_TTL, TimeUnit.MINUTES);
+        mqClient.sendMessage("messages.topic", "like.comment", likeComment);
+        mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_COMMENT_CACHE_QUEUE_ROUTING_KEY, new LikeMessage(id, 1), 100);
         return Result.ok();
     }
 

@@ -363,3 +363,20 @@ sequenceDiagram
         }
     }
     ```
+
+11. 确保点赞业务一致性的方法，可以通过判断当前点赞记录的创建时间和上一次刷新时间，每隔30min通过查询数据库SQL语句确保点赞数的一致性（最好使用事务确保刷新时一致性），下面是可能的代码实现：
+```java
+    @Override
+    public void refreshLikeNum() {
+        List<LikeNote> likeNotes = list();
+        for (LikeNote likeNote : likeNotes) {
+            if (likeNote.getCreateTime().getTime() - likeNote.getRefreshTime().getTime() > 30 * 60 * 1000) {
+                Integer likeNum = baseMapper.selectCount(query().eq("note_id", likeNote.getNoteId()));
+                hashRedisClient.hSet(CACHE_LIKENOTE_KEY + likeNote.getId(), "likeNum", likeNum);
+                hashRedisClient.expire(CACHE_LIKENOTE_KEY + likeNote.getId(), CACHE_LIKENOTE_TTL, TimeUnit.MINUTES);
+                likeNote.setRefreshTime(new Timestamp(System.currentTimeMillis()));
+                updateById(likeNote);
+            }
+        }
+    }
+```

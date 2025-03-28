@@ -42,7 +42,7 @@ import java.util.Objects;
 @Controller
 @RequestMapping("fileUpload")
 public class FileUploadController {
-    @Value("${file.upload-dir}")
+    @Value("")
     private String uploadDir;
 
     /**
