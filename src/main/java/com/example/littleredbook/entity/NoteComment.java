@@ -24,12 +24,12 @@ public class NoteComment {
   private Integer id;
   @TableField("note_id")
   private Integer noteId;
-  @TableField("user_id")
-  private Integer userId;
   @TableField("like_num")
   private Integer likeNum;
   @TableField("inner_comment")
   private String innerComment;
   @TableField("comment_time")
   private Timestamp commentTime;
+  @TableField("user_id")
+  private Integer userId;
 }

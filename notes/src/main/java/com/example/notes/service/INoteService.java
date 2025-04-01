@@ -5,6 +5,8 @@ import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.Note;
 
 import java.text.ParseException;
+import java.util.List;
+
 /**
  * 笔记业务服务接口
  *
@@ -33,6 +35,20 @@ public interface INoteService extends IService<Note> {
     Result getNoteById(Integer id) throws ParseException;
 
     /**
+     * 根据ID批量查询笔记信息
+     * @param ids 笔记ID列表
+     * @return Result标准响应（包含NoteDTO或错误信息）
+     */
+    Result getNotesByIds(List<Integer> ids);
+
+    /**
+     * 根据作者ID查询其所发布的笔记ID列表
+     * @param authorId 作者唯一标识
+     * @return Result标准响应（包含笔记ID列表或错误信息）
+     */
+    Result getNoteIdsByAuthorId(Integer authorId);
+
+    /**
      * 查询用户所有笔记
      * @param userId 用户唯一标识
      * @return Result标准响应（笔记列表或空提示）
@@ -48,17 +64,15 @@ public interface INoteService extends IService<Note> {
 
     /**
      * 获取全站笔记按点赞量排序
-     * @param userId 当前用户ID（预留排序算法扩展）
      * @return Result标准响应（点赞降序列表）
      */
-    Result getAllNotesSortedByLikeNum(Integer userId);
+    Result getAllNotesSortedByLikeNum();
 
     /**
      * 获取全站笔记按创建时间排序
-     * @param userId 当前用户ID（访问权限控制）
      * @return Result标准响应（时间倒序列表）
      */
-    Result getAllNotesSortedByCreatTime(Integer userId);
+    Result getAllNotesSortedByCreatTime();
 
     /**
      * 根据标签查询关联笔记
@@ -90,10 +104,26 @@ public interface INoteService extends IService<Note> {
     Result likeNote(Integer id, Integer userId);
 
     /**
+     * 收藏笔记
+     * @param id 笔记ID
+     * @param userId 用户ID
+     * @return Result标准响应（操作结果）
+     */
+    Result collectNote(Integer id, Integer userId);
+
+    /**
      * 更新笔记评论点赞数（带缓存失效）
      * @param id 评论ID
      * @param isLike 是否点赞
      * @return Result标准响应（操作结果）
      */
     Result updateNoteLikeNum(Integer id, boolean isLike);
+
+    /**
+     * 更新笔记收藏数（带缓存失效）
+     * @param id 笔记ID
+     * @param isCollection 是否收藏
+     * @return Result标准响应
+     */
+    Result updateNoteCollectionNum(Integer id, boolean isCollection);
 }

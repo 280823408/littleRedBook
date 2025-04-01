@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("searchRecord")
+@RequestMapping("search-records")
 public class SearchRecordController {
     @Resource
     private ISearchRecordService searchRecordService;
@@ -38,8 +38,8 @@ public class SearchRecordController {
      * @param id 搜索记录唯一标识
      * @return 包含搜索记录实体或错误信息的Result对象
      */
-    @GetMapping("getSearchRecordById")
-    public Result getSearchRecordById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getSearchRecordById(@PathVariable Integer id) {
         return searchRecordService.getSearchRecordById(id);
     }
 
@@ -48,8 +48,8 @@ public class SearchRecordController {
      * @param userId 用户唯一标识
      * @return 包含搜索记录集合的Result对象
      */
-    @GetMapping("getSearchRecordsByUserId")
-    public Result getSearchRecordsByUserId(@RequestParam Integer userId) {
+    @GetMapping("/users/{userId}")
+    public Result getSearchRecordsByUserId(@PathVariable Integer userId) {
         return searchRecordService.getSearchRecordsByUserId(userId);
     }
 
@@ -58,8 +58,8 @@ public class SearchRecordController {
      * @param id 要删除的记录ID
      * @return 操作结果的Result对象
      */
-    @GetMapping("removeSearchRecord")
-    public Result removeSearchRecord(@RequestParam Integer id) {
+    @DeleteMapping("/{id}")
+    public Result removeSearchRecord(@PathVariable Integer id) {
         return searchRecordService.removeSearchRecord(id);
     }
 
@@ -68,8 +68,8 @@ public class SearchRecordController {
      * @param userId 要清除记录的用户ID
      * @return 操作结果的Result对象
      */
-    @GetMapping("removeSearchRecordsByUserId")
-    public Result removeSearchRecordsByUserId(@RequestParam Integer userId) {
+    @DeleteMapping("/users/{userId}")
+    public Result removeSearchRecordsByUserId(@PathVariable Integer userId) {
         return searchRecordService.removeSearchRecordsByUserId(userId);
     }
 
@@ -78,7 +78,7 @@ public class SearchRecordController {
      * @param searchRecord 包含搜索内容的数据传输对象
      * @return 包含新增记录ID的Result对象
      */
-    @PostMapping("addSearchRecord")
+    @PostMapping
     public Result addSearchRecord(@RequestBody SearchRecord searchRecord) {
         return searchRecordService.addSearchRecord(searchRecord);
     }

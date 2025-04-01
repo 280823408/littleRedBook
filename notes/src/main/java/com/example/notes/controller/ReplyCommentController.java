@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("replyComment")
+@RequestMapping("reply-comments")
 public class ReplyCommentController {
     @Resource
     private IReplyCommentService replyCommentService;
@@ -38,8 +38,8 @@ public class ReplyCommentController {
      * @param id 回复评论唯一标识
      * @return 包含回复评论实体或错误信息的Result对象
      */
-    @GetMapping("getReplyCommentById")
-    public Result getReplyCommentById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getReplyCommentById(@PathVariable Integer id) {
         return replyCommentService.getReplyCommentById(id);
     }
 
@@ -48,9 +48,19 @@ public class ReplyCommentController {
      * @param commentId 评论唯一标识
      * @return 包含回复评论列表的Result对象（按时间排序）
      */
-    @GetMapping("getReplyCommentsByCommentId")
-    public Result getReplyCommentsByCommentId(@RequestParam Integer commentId) {
+    @GetMapping("/comments/{commentId}")
+    public Result getReplyCommentsByCommentId(@PathVariable Integer commentId) {
         return replyCommentService.getReplyCommentsByCommentId(commentId);
+    }
+
+    /**
+     * 获取回复评论互动通知
+     * @param userId 用户ID
+     * @return 包含回复评论互动通知的Result对象
+     */
+    @GetMapping("/notices/{userId}")
+    public Result getReplyCommentNotice(@PathVariable Integer userId) {
+        return replyCommentService.getReplyCommentNotice(userId);
     }
 
     /**
@@ -58,7 +68,7 @@ public class ReplyCommentController {
      * @param replyComment 包含回复评论内容、用户ID、评论ID的传输对象
      * @return 包含新回复评论ID的Result对象
      */
-    @PostMapping("addReplyComment")
+    @PostMapping
     public Result addReplyComment(@RequestBody ReplyComment replyComment) {
         return replyCommentService.addReplyComment(replyComment);
     }
@@ -69,8 +79,8 @@ public class ReplyCommentController {
      * @param userId 进行点赞的用户ID
      * @return 更新后的点赞状态及点赞数Result对象
      */
-    @GetMapping("likeReplyComment")
-    public Result likeReplyComment(@RequestParam Integer id, @RequestParam Integer userId) {
+    @PostMapping("/{id}/like")
+    public Result likeReplyComment(@PathVariable Integer id, @RequestParam Integer userId) {
         return replyCommentService.likeReplyComment(id, userId);
     }
 
@@ -79,8 +89,8 @@ public class ReplyCommentController {
      * @param id 回复评论唯一标识
      * @return 操作结果Result对象
      */
-    @GetMapping("removeReplyComment")
-    public Result removeReplyComment(@RequestParam Integer id) {
+    @DeleteMapping("/{id}")
+    public Result removeReplyComment(@PathVariable Integer id) {
         return replyCommentService.removeReplyComment(id);
     }
 }

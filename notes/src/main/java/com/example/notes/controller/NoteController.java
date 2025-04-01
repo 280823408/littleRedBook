@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.text.ParseException;
+import java.util.List;
 
 /**
  * 笔记功能控制器
@@ -31,7 +32,7 @@ import java.text.ParseException;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("notes")
+@RequestMapping("note")
 public class NoteController {
     @Resource
     private INoteService noteService;
@@ -40,11 +41,30 @@ public class NoteController {
      * 根据笔记ID获取笔记详情
      * @param id 笔记唯一标识
      * @return Result对象，包含笔记详情或错误信息
-     * @throws ParseException 当日期解析异常时抛出
      */
-    @GetMapping("getNoteById")
-    public Result getNoteById(@RequestParam Integer id) throws ParseException {
+    @GetMapping("/{id}")
+    public Result getNoteById(@PathVariable Integer id) throws ParseException {
         return noteService.getNoteById(id);
+    }
+
+    /**
+     * 根据作者ID查询其所发布的笔记ID列表
+     * @param authorId 作者唯一标识
+     * @return Result对象，包含笔记ID列表或错误信息
+     */
+    @GetMapping("/authors/{authorId}/notes")
+    public Result getNoteIdsByAuthorId(@PathVariable Integer authorId) {
+        return noteService.getNoteIdsByAuthorId(authorId);
+    }
+
+    /**
+     * 根据多个笔记ID批量获取笔记详情
+     * @param ids 笔记ID集合
+     * @return Result对象，包含笔记详情列表或错误信息
+     */
+    @GetMapping("/batch")
+    public Result getNotesByIds(@RequestParam(required = false) List<Integer> ids) {
+        return noteService.getNotesByIds(ids);
     }
 
     /**
@@ -52,8 +72,8 @@ public class NoteController {
      * @param userId 用户ID
      * @return Result对象，包含笔记列表或错误信息
      */
-    @GetMapping("getNotesByUserId")
-    public Result getNotesByUserId(@RequestParam Integer userId) {
+    @GetMapping("/users/{userId}")
+    public Result getNotesByUserId(@PathVariable Integer userId) {
         return noteService.getNotesByUserId(userId);
     }
 
@@ -62,29 +82,27 @@ public class NoteController {
      * @param title 笔记标题关键词
      * @return Result对象，包含匹配的笔记列表或错误信息
      */
-    @GetMapping("getNotesByTitle")
+    @GetMapping("/search")
     public Result getNotesByTitle(@RequestParam String title) {
         return noteService.getNotesByTitle(title);
     }
 
     /**
      * 获取全站笔记按点赞量排序
-     * @param userId 当前用户ID（用于个性化显示）
      * @return Result对象，包含排序后的笔记列表或错误信息
      */
-    @GetMapping("getAllNotesSortedByLikeNum")
-    public Result getAllNotesSortedByLikeNum(@RequestParam Integer userId) {
-        return noteService.getAllNotesSortedByLikeNum(userId);
+    @GetMapping("/sorted-by-like-num")
+    public Result getAllNotesSortedByLikeNum() {
+        return noteService.getAllNotesSortedByLikeNum();
     }
 
     /**
      * 获取全站笔记按创建时间排序
-     * @param userId 当前用户ID（用于访问控制）
      * @return Result对象，包含按时间排序的笔记列表或错误信息
      */
-    @GetMapping("getAllNotesSortedByCreatTime")
-    public Result getAllNotesSortedByCreatTime(@RequestParam Integer userId) {
-        return noteService.getAllNotesSortedByCreatTime(userId);
+    @GetMapping("/sorted-by-create-time")
+    public Result getAllNotesSortedByCreatTime() {
+        return noteService.getAllNotesSortedByCreatTime();
     }
 
     /**
@@ -92,8 +110,8 @@ public class NoteController {
      * @param tagId 标签唯一标识
      * @return Result对象，包含该标签下的笔记集合或错误信息
      */
-    @GetMapping("getNotesByTag")
-    public Result getNotesByTag(@RequestParam Integer tagId) {
+    @GetMapping("/tags/{tagId}")
+    public Result getNotesByTag(@PathVariable Integer tagId) {
         return noteService.getNotesByTag(tagId);
     }
 
@@ -102,7 +120,7 @@ public class NoteController {
      * @param note 笔记实体对象（JSON格式）
      * @return Result对象，包含新建笔记ID或错误信息
      */
-    @PostMapping("addNote")
+    @PostMapping
     public Result addNote(@RequestBody Note note) {
         return noteService.addNote(note);
     }
@@ -112,8 +130,8 @@ public class NoteController {
      * @param note 笔记实体对象（需包含ID）
      * @return Result对象，包含更新状态或错误信息
      */
-    @PostMapping("updateNote")
-    public Result updateNote(@RequestBody Note note) {
+    @PutMapping("/{id}")
+    public Result updateNote(@PathVariable Integer id, @RequestBody Note note) {
         return noteService.updateNote(note);
     }
 
@@ -123,8 +141,19 @@ public class NoteController {
      * @param userId 当前用户ID（用于点赞记录）
      * @return Result对象，包含点赞操作结果或错误信息
      */
-    @GetMapping("likeNote")
-    public Result likeNote(@RequestParam Integer id, @RequestParam Integer userId) {
+    @PostMapping("/{id}/like")
+    public Result likeNote(@PathVariable Integer id, @RequestParam Integer userId) {
         return noteService.likeNote(id, userId);
+    }
+
+    /**
+     * 收藏/取消收藏笔记
+     * @param id 笔记ID（用于收藏记录）
+     * @param userId 当前用户ID（用于收藏记录）
+     * @return Result对象，包含收藏操作结果或错误信息
+     */
+    @PostMapping("/{id}/collect")
+    public Result collectNote(@PathVariable Integer id, @RequestParam Integer userId) {
+        return noteService.collectNote(id, userId);
     }
 }

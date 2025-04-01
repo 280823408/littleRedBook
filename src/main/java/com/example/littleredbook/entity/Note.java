@@ -34,10 +34,10 @@ public class Note {
     private String content;
     /** 点赞数 */
     @TableField("like_num")
-    private Double likeNum;
+    private Integer likeNum;
     /** 收藏数 */
     @TableField("collections_num")
-    private Double collectionsNum;
+    private Integer collectionsNum;
     /** 更新时间 */
     @TableField("update_time")
     private Timestamp updateTime;

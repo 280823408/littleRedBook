@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("tag")
+@RequestMapping("tags")
 public class TagController {
     @Resource
     private ITagService tagService;
@@ -39,8 +39,8 @@ public class TagController {
      * @param id 标签唯一标识
      * @return 包含标签实体或错误信息的Result对象
      */
-    @GetMapping("getTagById")
-    public Result getTagById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getTagById(@PathVariable Integer id) {
         return tagService.getTagById(id);
     }
 
@@ -49,7 +49,7 @@ public class TagController {
      *
      * @return 包含标签集合的Result对象
      */
-    @GetMapping("getAllTags")
+    @GetMapping
     public Result getAllTags() {
         return tagService.getAllTags();
     }
@@ -60,7 +60,7 @@ public class TagController {
      * @param tag 待新增的标签数据传输对象
      * @return 操作结果的Result对象
      */
-    @PostMapping("addTag")
+    @PostMapping
     public Result addTag(@RequestBody Tag tag) {
         return tagService.addTag(tag);
     }
@@ -71,8 +71,8 @@ public class TagController {
      * @param noteId 笔记唯一标识
      * @return 包含关联标签列表的Result对象
      */
-    @GetMapping ("getTagsByNoteId")
-    public Result getTagsByNoteId(@RequestParam Integer noteId) {
+    @GetMapping("/notes/{noteId}")
+    public Result getTagsByNoteId(@PathVariable Integer noteId) {
         return tagService.getTagsByNoteId(noteId);
     }
 
@@ -80,10 +80,10 @@ public class TagController {
      * 获取指定标签关联的所有笔记ID
      *
      * @param tagId 标签唯一标识
-     * @return 包含关联标签列表的Result对象
+     * @return 包含关联笔记ID列表的Result对象
      */
-    @GetMapping("getNoteIdByTagId")
-    public Result getNoteIdByTagId(@RequestParam Integer tagId) {
+    @GetMapping("/{tagId}/notes")
+    public Result getNoteIdByTagId(@PathVariable Integer tagId) {
         return tagService.getNoteIdByTagId(tagId);
     }
 
@@ -94,8 +94,8 @@ public class TagController {
      * @param noteId 笔记ID
      * @return 关联操作结果的Result对象
      */
-    @GetMapping("addNoteTag")
-    public Result addNoteTag(@RequestParam Integer tagId, @RequestParam Integer noteId) {
+    @PostMapping("/{tagId}/notes/{noteId}")
+    public Result addNoteTag(@PathVariable Integer tagId, @PathVariable Integer noteId) {
         return tagService.addNoteTag(tagId, noteId);
     }
 }

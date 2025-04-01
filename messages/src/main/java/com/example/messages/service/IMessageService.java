@@ -38,12 +38,26 @@ public interface IMessageService extends IService<Message> {
     Result getMessageById(Integer id);
 
     /**
+     * 根据接收方ID获取未读消息列表
+     * @param receiverId 接受方用户ID
+     * @return 包含消息时间轴列表的Result对象
+     */
+    Result getMessagesByReceiverIdWithNoRead(Integer receiverId);
+
+    /**
      * 获取指定用户的完整会话记录（按发送时间排序）
      * @param sendId 发送方用户ID
      * @param receiverId 接收方用户ID
      * @return 包含消息时间轴列表的Result对象
      */
     Result getMessagesBySenderIdAndReceiverIdOrderBySendTime(Integer sendId, Integer receiverId);
+
+    /**
+     * 获取指定用户的未读消息通知
+     * @param userId 用户ID
+     * @return 包含消息时间轴列表的Result对象
+     */
+    Result getMessagesNotices(Integer userId);
 
     /**
      * 在有效期内撤回消息（如发送后5分钟内）

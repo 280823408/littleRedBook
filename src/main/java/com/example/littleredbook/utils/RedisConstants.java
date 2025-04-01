@@ -33,7 +33,7 @@ public class RedisConstants {
     public static final String CACHE_TAG_KEY = "little_red_book:cache:tag:";
     public static final String CACHE_NOTE_KEY = "little_red_book:cache:note:";
     public static final String CACHE_TAGLIST_KEY = "little_red_book:cache:tag:list";
-    public static final String CACHE_NOTELIST_KEY = "little_red_book:cache:note:list";
+    public static final String CACHE_NOTELIST_KEY = "little_red_book:cache:note:list:";
     public static final Long CACHE_TAGLIST_TTL = 30L;
     public static final Long CACHE_NOTELIST_TTL = 30L;
     public static final Long CACHE_NOTE_TTL = 10L;

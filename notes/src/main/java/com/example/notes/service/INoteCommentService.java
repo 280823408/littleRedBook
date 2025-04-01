@@ -41,6 +41,20 @@ public interface INoteCommentService extends IService<NoteComment> {
     Result getNoteCommentsByNoteId(Integer noteId);
 
     /**
+     * 获取指定用户的全部评论（按时间倒序）
+     * @param userId 用户ID
+     * @return 包含评论列表的Result对象
+     */
+    Result getNoteCommentsByUserId(Integer userId);
+
+    /**
+     * 获取用户点赞的评论通知
+     * @param userId 用户ID
+     * @return 包含点赞评论列表的Result对象
+     */
+    Result getNoteCommentNotice(Integer userId);
+
+    /**
      * 新增笔记评论记录
      * @param noteComment 包含评论内容的实体对象
      * @return 包含新增评论ID的Result对象

@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("noteComment")
+@RequestMapping("note-comments")
 public class NoteCommentController {
     @Resource
     private INoteCommentService noteCommentService;
@@ -38,8 +38,8 @@ public class NoteCommentController {
      * @param id 评论唯一标识
      * @return 包含评论实体或错误信息的Result对象
      */
-    @GetMapping("getNoteCommentById")
-    public Result getNoteCommentById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getNoteCommentById(@PathVariable Integer id) {
         return noteCommentService.getNoteCommentById(id);
     }
 
@@ -48,9 +48,29 @@ public class NoteCommentController {
      * @param noteId 笔记唯一标识
      * @return 包含评论列表的Result对象（按时间排序）
      */
-    @GetMapping("getNoteCommentByNoteId")
-    public Result getNoteCommentByNoteId(@RequestParam Integer noteId) {
+    @GetMapping("/notes/{noteId}")
+    public Result getNoteCommentByNoteId(@PathVariable Integer noteId) {
         return noteCommentService.getNoteCommentsByNoteId(noteId);
+    }
+
+    /**
+     * 获取指定用户下的所有评论
+     * @param userId 用户唯一标识
+     * @return 包含评论列表的Result对象（按时间排序）
+     */
+    @GetMapping("/users/{userId}")
+    public Result getNoteCommentByUserId(@PathVariable Integer userId) {
+        return noteCommentService.getNoteCommentsByUserId(userId);
+    }
+
+    /**
+     * 获取用户评论互动通知
+     * @param userId 用户唯一标识
+     * @return 包含评论互动通知的Result对象
+     */
+    @GetMapping("/notices/{userId}")
+    public Result getNoteCommentNotice(@PathVariable Integer userId) {
+        return noteCommentService.getNoteCommentNotice(userId);
     }
 
     /**
@@ -58,7 +78,7 @@ public class NoteCommentController {
      * @param noteComment 包含评论内容、用户ID、笔记ID的传输对象
      * @return 包含新评论ID的Result对象
      */
-    @PostMapping("addNoteComment")
+    @PostMapping
     public Result addNoteComment(@RequestBody NoteComment noteComment) {
         return noteCommentService.addNoteComment(noteComment);
     }
@@ -69,8 +89,8 @@ public class NoteCommentController {
      * @param userId 进行点赞的用户ID
      * @return 更新后的点赞状态及点赞数Result对象
      */
-    @GetMapping("likeNoteComment")
-    public Result likeNoteComment(@RequestParam Integer id, @RequestParam Integer userId) {
+    @PostMapping("/{id}/like")
+    public Result likeNoteComment(@PathVariable Integer id, @RequestParam Integer userId) {
         return noteCommentService.likeNoteComment(id, userId);
     }
 
@@ -79,8 +99,8 @@ public class NoteCommentController {
      * @param id 评论唯一标识
      * @return 操作结果Result对象
      */
-    @GetMapping("removeNoteComment")
-    public Result removeNoteComment(@RequestParam Integer id) {
+    @DeleteMapping("/{id}")
+    public Result removeNoteComment(@PathVariable Integer id) {
         return noteCommentService.removeNoteComment(id);
     }
 }

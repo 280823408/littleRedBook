@@ -380,3 +380,37 @@ sequenceDiagram
         }
     }
 ```
+
+12. 由于点赞采用了消息队列+缓存的方式，导致前端不断更新数据时可能用户的点赞数据还未刷新到数据库中，
+所以可以采用延迟刷新的方式，即在点赞操作后，前端会先更新点赞数，延迟一段时间后再查询新的点赞数。若可能出现问题的话，可以采用定时任务刷新以确保一致性。  
+  并且根据测试发现本质上是消息队列异步导致的，因此直接操作缓存而不采用消息队列一样可以解决该问题。
+①  在原刷新基础上，增加定时器，延迟一段时间后再查询新的点赞数。
+```javascript
+watch: {
+    comments: {
+      handler (newComments) {
+        setTimeout(() => {
+          newComments.forEach(comment => {
+            this.isLikeNoteComment(comment.id)
+          })
+        }, 100)
+      },
+      deep: true
+    },
+```
+② 注释处即直接操作缓存 
+```java
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Result addLikeComment(LikeComment likeComment) {
+    likeComment.setLikeTime(new Timestamp(System.currentTimeMillis()));
+    if (!this.save(likeComment)) {
+    throw new RuntimeException("添加新的点赞评论记录失败");
+    }
+    //        hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_KEY + likeComment.getId(), likeComment);
+    mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKECOMMENT_CACHE_ADD_QUEUE_ROUTING_KEY, likeComment);
+    hashRedisClient.hSet(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId()
+    ,"id", likeComment.getId(), CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
+    return Result.ok();
+    }
+```

@@ -1,8 +1,10 @@
 package com.example.notes.utils;
 
+import com.example.littleredbook.config.FeignConfiguration;
 import com.example.littleredbook.dto.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -25,21 +27,29 @@ import java.util.List;
  * @author Mike
  * @since 2025/2/24
  */
-@FeignClient(name = "userCenter", url = "http://localhost:8101")
+@FeignClient(name = "userCenter", url = "http://localhost:8101", configuration = FeignConfiguration.class)
 public interface UserCenterClient {
     /**
      * 根据用户ID查询用户信息
      * @param id 用户唯一标识
      * @return Result标准响应（包含UserDTO或错误信息）
      */
-    @GetMapping("/user/getUserById")
-    Result getUserById(@RequestParam Integer id);
+    @GetMapping("/users/{id}")
+    Result getUserById(@PathVariable Integer id);
 
     /**
      * 批量查询用户信息
      * @param ids 用户ID集合
      * @return Result标准响应（包含List<UserDTO>或错误信息）
      */
-    @GetMapping("/user/getUsersByIds")
+    @GetMapping("/users/batch")
     Result getUsersByIds(@RequestParam List<Integer> ids);
+
+    /**
+     * 根据用户ID查询用户收藏记录
+     * @param userId 用户唯一标识
+     * @return Result标准响应（包含List<Collections>或错误信息）
+     */
+    @GetMapping("/collections/user/{userId}/note/{noteId}")
+    Result getCollectionsByUserIdAndNoteId(@PathVariable Integer userId, @PathVariable Integer noteId);
 }

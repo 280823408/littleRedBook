@@ -48,6 +48,21 @@ public interface IConcernService extends IService<Concern> {
     Result getConcernNumByUserId(Integer userId);
 
     /**
+     * 根据用户ID与粉丝ID查询关注关系
+     * @param userId 目标用户唯一标识
+     * @param fansId 粉丝用户唯一标识
+     * @return 包含关注关系实体的Result对象
+     */
+    Result getConcernByUserIdAndFansId(Integer userId, Integer fansId);
+
+    /**
+     * 获取关注通知
+     * @param userId 用户ID
+     * @return 包含关注通知的Result对象
+     */
+    Result getConcernNotice(Integer userId);
+
+    /**
      * 根据ID移除关注关系
      * @param id 关注关系唯一标识
      * @return 删除操作结果的Result对象

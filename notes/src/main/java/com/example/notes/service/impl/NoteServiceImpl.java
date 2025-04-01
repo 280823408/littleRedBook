@@ -9,6 +9,7 @@ import com.example.littleredbook.entity.*;
 import com.example.littleredbook.utils.HashRedisClient;
 import com.example.littleredbook.utils.MQClient;
 import com.example.littleredbook.utils.StringRedisClient;
+import com.example.notes.dto.LikeMessage;
 import com.example.notes.dto.NoteDTO;
 import com.example.notes.mapper.NoteMapper;
 import com.example.notes.service.INoteService;
@@ -23,11 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.littleredbook.utils.MQConstants.*;
+import static com.example.littleredbook.utils.MQConstants.TOPIC_USER_EXCHANGE_WITH_USERCENTER_USER_CACHE_LIKE_QUEUE_ROUTING_KEY;
 import static com.example.littleredbook.utils.RedisConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.CACHE_NOTELIST_TTL;
 
@@ -86,6 +88,51 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         return Result.ok(noteDTO);
     }
 
+    /**
+     * 根据作者ID查询其所发布的笔记ID列表
+     * @param authorId 作者唯一标识
+     * @return Result标准响应（包含笔记ID列表或错误信息）
+     */
+    @Override
+    public Result getNoteIdsByAuthorId(Integer authorId) {
+        List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id").eq("user_id", authorId), obj -> (Integer) obj);
+        if (noteIds.isEmpty()) {
+            return Result.ok(java.util.Collections.emptyList());
+        }
+        return Result.ok(noteIds);
+    }
+
+    /**
+     * 根据笔记ID查询笔记列表
+     * @param ids 笔记ID列表
+     * @return Result标准响应，包含笔记列表
+     */
+    @Override
+    public Result getNotesByIds(List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Result.ok(java.util.Collections.emptyList());
+        }
+        List<NoteDTO> noteDTOS = new ArrayList<>();
+        for (Integer id : ids) {
+            try {
+                noteDTOS.add(hashRedisClient.queryWithMutex(
+                        CACHE_NOTE_KEY,
+                        id,
+                        NoteDTO.class,
+                        this::getNoteDTOFromDB,
+                        CACHE_NOTE_TTL,
+                        TimeUnit.MINUTES
+                ));
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if (noteDTOS.isEmpty()) {
+            return Result.ok(java.util.Collections.emptyList());
+        }
+        return Result.ok(noteDTOS);
+    }
+
 
 //    /**
 //     * 根据笔记ID查询笔记(通过JSON字符串存储版本)
@@ -114,18 +161,29 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
      */
     @Override
     public Result getNotesByUserId(Integer userId) {
-        List<NoteDTO> noteDTOS = stringRedisClient.queryListWithMutex(
-                CACHE_NOTE_USER_KEY,
-                userId,
-                NoteDTO.class,
-                this::getNoteDTOsFromDBForUserId,
-                CACHE_NOTE_USER_TTL,
-                TimeUnit.MINUTES
-        );
-        if (noteDTOS.isEmpty()) {
-            return Result.fail("该用户没有笔记!");
+        List<Integer> noteIds = listObjs(query().getWrapper().eq("user_id", userId).select("id"));
+        List<NoteDTO> noteDTOS = new ArrayList<>();
+        for (Integer noteId : noteIds) {
+            try {
+                Result result = getNoteById(noteId);
+                noteDTOS.add((NoteDTO) result.getData());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
         return Result.ok(noteDTOS);
+//        List<NoteDTO> noteDTOS = stringRedisClient.queryListWithMutex(
+//                CACHE_NOTE_USER_KEY,
+//                userId,
+//                NoteDTO.class,
+//                this::getNoteDTOsFromDBForUserId,
+//                CACHE_NOTE_USER_TTL,
+//                TimeUnit.MINUTES
+//        );
+//        if (noteDTOS.isEmpty()) {
+//            return Result.fail("该用户没有笔记!");
+//        }
+//        return Result.ok(noteDTOS);
     }
 
     /**
@@ -143,11 +201,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteIds.forEach(id -> {
             try {
                 noteDTOS.add(hashRedisClient.queryWithMutex(
-                        CACHE_NOTELIST_KEY,
+                        CACHE_NOTE_KEY,
                         id,
                         NoteDTO.class,
                         this::getNoteDTOFromDB,
-                        CACHE_NOTELIST_TTL,
+                        CACHE_NOTE_TTL,
                         TimeUnit.MINUTES
                 ));
             } catch (ParseException e) {
@@ -159,11 +217,10 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
 
     /**
      * 获取全站笔记并按点赞数降序排列
-     * @param userId 当前用户ID（预留字段）
      * @return Result标准响应，包含排序后的笔记列表
      */
     @Override
-    public Result getAllNotesSortedByLikeNum(Integer userId) {
+    public Result getAllNotesSortedByLikeNum() {
         List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id"), obj -> (Integer) obj);
         List<NoteDTO> noteDTOS = new ArrayList<>();
         if (noteIds.isEmpty()) {
@@ -172,11 +229,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteIds.forEach(id -> {
             try {
                 noteDTOS.add(hashRedisClient.queryWithMutex(
-                        CACHE_NOTELIST_KEY,
+                        CACHE_NOTE_KEY,
                         id,
                         NoteDTO.class,
                         this::getNoteDTOFromDB,
-                        CACHE_NOTELIST_TTL,
+                        CACHE_NOTE_TTL,
                         TimeUnit.MINUTES
                 ));
             } catch (ParseException e) {
@@ -189,11 +246,10 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
 
     /**
      * 获取全站笔记并按创建时间倒序排列
-     * @param userId 当前用户ID（预留字段）
      * @return Result标准响应，包含时间排序的笔记列表
      */
     @Override
-    public Result getAllNotesSortedByCreatTime(Integer userId) {
+    public Result getAllNotesSortedByCreatTime() {
         List<Integer> noteIds = listObjs(new QueryWrapper<Note>().select("id"), obj -> (Integer) obj);
         List<NoteDTO> noteDTOS = new ArrayList<>();
         if (noteIds.isEmpty()) {
@@ -202,11 +258,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteIds.forEach(id -> {
             try {
                 noteDTOS.add(hashRedisClient.queryWithMutex(
-                        CACHE_NOTELIST_KEY,
+                        CACHE_NOTE_KEY,
                         id,
                         NoteDTO.class,
                         this::getNoteDTOFromDB,
-                        CACHE_NOTELIST_TTL,
+                        CACHE_NOTE_TTL,
                         TimeUnit.MINUTES
                 ));
             } catch (ParseException e) {
@@ -225,7 +281,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     @Override
     public Result getNotesByTag(Integer tagId) {
         Object tagData = communityClient.getNoteIdByTagId(tagId).getData();
-        List<Integer> noteIds = BeanUtil.copyToList((List<?>) tagData, Integer.class);
+        List<Integer> noteIds = (List<Integer>) tagData;
         List<NoteDTO> noteDTOS = new ArrayList<>();
         if (noteIds.isEmpty()) {
             return Result.fail("没有找到相关笔记!");
@@ -233,11 +289,11 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         noteIds.forEach(id -> {
             try {
                 noteDTOS.add(hashRedisClient.queryWithMutex(
-                        CACHE_NOTELIST_KEY,
+                        CACHE_NOTE_KEY,
                         id,
                         NoteDTO.class,
                         this::getNoteDTOFromDB,
-                        CACHE_NOTELIST_TTL,
+                        CACHE_NOTE_TTL,
                         TimeUnit.MINUTES
                 ));
             } catch (ParseException e) {
@@ -282,6 +338,12 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         return Result.ok();
     }
 
+    /**
+     * 点赞笔记（带缓存失效）
+     * @param id 笔记ID
+     * @param userId 用户ID
+     * @return Result标准响应，包含操作结果
+     */
     @Override
     public Result likeNote(Integer id, Integer userId) {
         Object likeNoteData =  messagesClient.getLikeNoteByNoteIdAndUserId(
@@ -291,19 +353,49 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         INoteService noteService = (INoteService) AopContext.currentProxy();
         noteService.updateNoteLikeNum(id, isLike);
         if (isLike) {
-            messagesClient.removeLikeNote(likeNote.getId());
-            hashRedisClient.hIncrement(CACHE_NOTE_KEY + id, "likeNum", -1);
-            hashRedisClient.expire(CACHE_NOTE_KEY + id, CACHE_NOTE_TTL, TimeUnit.MINUTES);
+            mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKENOTE_LIKE_QUEUE_ROUTING_KEY, likeNote);
+            mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_LIKE_QUEUE_ROUTING_KEY, new LikeMessage(id, -1));
             return Result.ok();
         }
         likeNote.setNoteId(id);
         likeNote.setUserId(userId);
-        messagesClient.addLikeNote(likeNote);
-        hashRedisClient.hIncrement(CACHE_NOTE_KEY + id, "likeNum", 1);
-        hashRedisClient.expire(CACHE_NOTE_KEY + id, CACHE_NOTE_TTL, TimeUnit.MINUTES);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKENOTE_LIKE_QUEUE_ROUTING_KEY, likeNote);
+        mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_LIKE_QUEUE_ROUTING_KEY, new LikeMessage(id, 1));
         return Result.ok();
     }
 
+    /**
+     * 收藏笔记（带缓存失效）
+     * @param id 笔记ID
+     * @param userId 用户ID
+     * @return Result标准响应，包含操作结果
+     */
+    @Override
+    public Result collectNote(Integer id, Integer userId) {
+        Object collectionData =  userCenterClient.getCollectionsByUserIdAndNoteId(
+                id, userId).getData();
+        Collections collections = BeanUtil.mapToBean((Map<?, ?>) collectionData, Collections.class, true);
+        boolean isCollection = collections.getId() != null;
+        INoteService noteService = (INoteService) AopContext.currentProxy();
+        noteService.updateNoteCollectionNum(id, isCollection);
+        if (isCollection) {
+            mqClient.sendMessage(TOPIC_USER_EXCHANGE, TOPIC_USER_EXCHANGE_WITH_USERCENTER_COLLECTIONS_CACHE_LIKE_QUEUE_ROUTING_KEY, collections);
+            mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_COLLECTION_QUEUE_ROUTING_KEY, new LikeMessage(id, -1), 100);
+            return Result.ok();
+        }
+        collections.setNoteId(id);
+        collections.setUserId(userId);
+        mqClient.sendMessage(TOPIC_USER_EXCHANGE, TOPIC_USER_EXCHANGE_WITH_USERCENTER_COLLECTIONS_CACHE_LIKE_QUEUE_ROUTING_KEY, collections);
+        mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_COLLECTION_QUEUE_ROUTING_KEY, new LikeMessage(id, 1), 100);
+        return Result.ok();
+    }
+
+    /**
+     * 更新笔记点赞数（带缓存失效）
+     * @param id 笔记ID
+     * @param isLike 是否点赞
+     * @return Result标准响应，包含操作结果
+     */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result updateNoteLikeNum(Integer id, boolean isLike) {
@@ -311,7 +403,25 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         if (!update(new LambdaUpdateWrapper<Note>()
                 .eq(Note::getId, id)
                 .setSql(sql))) {
-            throw new RuntimeException("更新评论点赞数失败");
+            throw new RuntimeException("更新笔记点赞数失败");
+        }
+        return Result.ok();
+    }
+
+    /**
+     * 更新笔记收藏数（带缓存失效）
+     * @param id 笔记ID
+     * @param isCollection 是否收藏
+     * @return Result标准响应，包含操作结果
+     */
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Result updateNoteCollectionNum(Integer id, boolean isCollection) {
+        String sql = isCollection ? "collections_num = like_num - 1" : "collections = collections + 1";
+        if (!update(new LambdaUpdateWrapper<Note>()
+                .eq(Note::getId, id)
+                .setSql(sql))) {
+            throw new RuntimeException("更新笔记收藏数失败");
         }
         return Result.ok();
     }
@@ -354,7 +464,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     private List<NoteDTO> getNoteDTOsFromDBForUserId(Integer userId) {
         List<Note> notes = list(new QueryWrapper<Note>().eq("user_id", userId));
         if (notes.isEmpty()) {
-            return Collections.emptyList();
+            return java.util.Collections.emptyList();
         }
         Object data = userCenterClient.getUserById(userId).getData();
         User user = BeanUtil.mapToBean((Map<?, ?>) data, User.class, true);

@@ -8,10 +8,7 @@ import com.example.littleredbook.entity.LikeReply;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 消息服务Feign客户端
@@ -41,25 +38,26 @@ public interface MessagesClient {
      * @param likeComment 点赞评论请求体（包含用户ID、评论ID等信息）
      * @return Result标准响应（包含操作结果或错误信息）
      */
-    @PostMapping("/likeComment/addLikeComment")
+    @PostMapping("/like-comments")
     Result addLikeComment(@RequestBody LikeComment likeComment);
-
     /**
      * 根据评论ID和用户ID查询点赞记录
      * @param commentId 评论唯一标识
      * @param userId 用户唯一标识
      * @return Result标准响应（包含LikeComment或错误信息）
      */
-    @GetMapping("/likeComment/getLikeCommentByCommentIdAndUserId")
-    Result getLikeCommentByCommentIdAndUserId(@RequestParam Integer commentId, @RequestParam Integer userId);
+    @GetMapping("/like-comments/comments/{commentId}/users/{userId}")
+    Result getLikeCommentByCommentIdAndUserId(
+            @PathVariable Integer commentId,
+            @PathVariable Integer userId);
 
     /**
      * 移除评论点赞记录
      * @param id 点赞记录唯一标识
      * @return Result标准响应（包含操作结果或错误信息）
      */
-    @GetMapping("/likeComment/removeLikeComment")
-    Result removeLikeComment(@RequestParam Integer id);
+    @DeleteMapping("/like-comments/{id}")
+    Result removeLikeComment(@PathVariable Integer id);
 
     /**
      * 查询笔记点赞记录
@@ -67,25 +65,25 @@ public interface MessagesClient {
      * @param userId 用户唯一标识
      * @return Result标准响应（包含LikeNote或错误信息）
      */
-    @GetMapping("/likeNote/getLikeNoteByNoteIdAndUserId")
+    @GetMapping("/like-notes/notes/{noteId}/users/{userId}")
     Result getLikeNoteByNoteIdAndUserId(
-            @RequestParam Integer noteId,
-            @RequestParam Integer userId);
+            @PathVariable Integer noteId,
+            @PathVariable Integer userId);
 
     /**
      * 移除笔记点赞记录
      * @param id 点赞记录唯一标识
      * @return Result标准响应（包含操作结果或错误信息）
      */
-    @GetMapping("/likeNote/removeLikeNote")
-    Result removeLikeNote(@RequestParam Integer id);
+    @DeleteMapping("/like-notes/{id}")
+    Result removeLikeNote(@PathVariable Integer id);
 
     /**
      * 添加笔记点赞记录
      * @param likeNote 点赞笔记请求体（包含用户ID、笔记ID等信息）
      * @return Result标准响应（包含操作结果或错误信息）
      */
-    @PostMapping("/likeNote/addLikeNote")
+    @PostMapping("/like-notes")
     Result addLikeNote(@RequestBody LikeNote likeNote);
 
     /**
@@ -94,24 +92,24 @@ public interface MessagesClient {
      * @param userId 用户唯一标识
      * @return Result标准响应（包含LikeReply或错误信息）
      */
-    @GetMapping("/likeReply/getLikeReplyByReplyIdAndUserId")
+    @GetMapping("/like-replies/replies/{replyId}/users/{userId}")
     Result getLikeReplyByReplyIdAndUserId(
-            @RequestParam Integer replyId,
-            @RequestParam Integer userId);
+            @PathVariable Integer replyId,
+            @PathVariable Integer userId);
 
     /**
      * 移除回复点赞记录
      * @param id 点赞记录唯一标识
      * @return Result标准响应（包含操作结果或错误信息）
      */
-    @GetMapping("/likeReply/removeLikeReply")
-    Result removeLikeReply(@RequestParam Integer id);
+    @DeleteMapping("/like-replies/{id}")
+    Result removeLikeReply(@PathVariable Integer id);
 
     /**
      * 添加回复点赞记录
      * @param likeReply 点赞回复请求体（包含用户ID、回复ID等信息）
      * @return Result标准响应（包含操作结果或错误信息）
      */
-    @PostMapping("/likeReply/addLikeReply")
+    @PostMapping("/like-replies")
     Result addLikeReply(@RequestBody LikeReply likeReply);
 }

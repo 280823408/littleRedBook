@@ -32,5 +32,5 @@ public class User {
     private String userPassword;
     /** 粉丝数量 */
     @TableField("fans_num")
-    private Double FansNum;
+    private Integer fansNum;
 }

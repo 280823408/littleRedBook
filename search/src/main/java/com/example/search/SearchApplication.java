@@ -12,7 +12,9 @@ import org.springframework.context.annotation.Import;
 @SpringBootApplication
 @MapperScan("com.example.search.mapper")
 @Import({com.example.littleredbook.config.RedissonConfig.class, com.example.littleredbook.utils.StringRedisClient.class,
-        com.example.littleredbook.utils.HashRedisClient.class})
+        com.example.littleredbook.utils.HashRedisClient.class, com.example.littleredbook.config.MqConfig.class,
+        com.example.littleredbook.config.ErrorMessageConfiguration.class, com.example.littleredbook.utils.MQClient.class,
+        com.example.littleredbook.config.WebConfig.class})
 public class SearchApplication {
     public static void main(String[] args) {
         SpringApplication.run(SearchApplication.class, args);

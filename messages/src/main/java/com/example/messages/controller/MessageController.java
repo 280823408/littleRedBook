@@ -32,7 +32,7 @@ import java.util.List;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("messages")
+@RequestMapping("message")
 public class MessageController {
     @Resource
     private IMessageService messageService;
@@ -43,9 +43,20 @@ public class MessageController {
      * @param id 消息唯一标识
      * @return 包含消息实体或错误信息的Result对象
      */
-    @GetMapping("getMessageById")
-    public Result getMessageById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getMessageById(@PathVariable Integer id) {
         return messageService.getMessageById(id);
+    }
+
+    /**
+     * 获取未读消息列表
+     *
+     * @param receiverId 接收方用户ID
+     * @return 未读消息列表Result对象
+     */
+    @GetMapping("/receiver/unread/{receiverId}")
+    public Result getMessagesByReceiverIdWithNoRead(@PathVariable Integer receiverId) {
+        return messageService.getMessagesByReceiverIdWithNoRead(receiverId);
     }
 
     /**
@@ -55,21 +66,31 @@ public class MessageController {
      * @param receiverId 接收方用户ID
      * @return 按发送时间排序的消息列表Result对象
      */
-    @GetMapping("getMessagesBySenderIdAndReceiverId")
+    @GetMapping("/conversations/{senderId}/{receiverId}")
     public Result getMessagesBySenderIdAndReceiverId(
-            @RequestParam Integer senderId,
-            @RequestParam Integer receiverId) {
+            @PathVariable Integer senderId,
+            @PathVariable Integer receiverId) {
         return messageService.getMessagesBySenderIdAndReceiverIdOrderBySendTime(senderId, receiverId);
     }
 
     /**
+     * 获取用户消息通知
+     *
+     * @param userId 用户ID
+     * @return 消息通知Result对象
+     */
+    @GetMapping("/notices/{userId}")
+    public Result getMessagesNotices(@PathVariable Integer userId) {
+        return messageService.getMessagesNotices(userId);
+    }
+
+    /**
      * 在允许的时间范围内撤回消息
-     * （注意：GET请求携带RequestBody非常规用法，建议改用POST）
      *
      * @param message 包含消息ID和必要验证字段的消息对象
      * @return 撤回操作结果Result对象
      */
-    @GetMapping("revokeMessageInLimitTime")
+    @PostMapping("/revoke")
     public Result revokeMessageInLimitTime(@RequestBody Message message) {
         return messageService.revokeMessageInLimitTime(message);
     }
@@ -80,19 +101,18 @@ public class MessageController {
      * @param id 消息唯一标识
      * @return 删除操作结果Result对象
      */
-    @GetMapping("removeMessage")
-    public Result removeMessage(@RequestParam Integer id) {
+    @DeleteMapping("/{id}")
+    public Result removeMessage(@PathVariable Integer id) {
         return messageService.removeMessage(id);
     }
 
     /**
      * 批量删除消息记录
-     * （注意：GET请求携带RequestBody非常规用法，建议改用POST）
      *
      * @param ids 需要删除的消息ID列表
      * @return 批量删除操作结果Result对象
      */
-    @GetMapping("removeMessages")
+    @DeleteMapping
     public Result removeMessages(@RequestBody List<Integer> ids) {
         return messageService.removeMessages(ids);
     }
@@ -106,10 +126,10 @@ public class MessageController {
      * @param endTime    时间区间结束时间戳
      * @return 删除操作结果Result对象
      */
-    @GetMapping("removeMessagesInTimeInterval")
+    @DeleteMapping("/conversations/{senderId}/{receiverId}")
     public Result removeMessagesInTimeInterval(
-            @RequestParam Integer senderId,
-            @RequestParam Integer receiverId,
+            @PathVariable Integer senderId,
+            @PathVariable Integer receiverId,
             @RequestParam Timestamp startTime,
             @RequestParam Timestamp endTime) {
         return messageService.removeMessagesInTimeInterval(senderId, receiverId, startTime, endTime);
@@ -121,7 +141,7 @@ public class MessageController {
      * @param message 包含发送方、接收方、内容的消息对象
      * @return 消息发送结果Result对象（包含新消息ID）
      */
-    @PostMapping("addMessage")
+    @PostMapping
     public Result addMessage(@RequestBody Message message) {
         return messageService.addMessage(message);
     }

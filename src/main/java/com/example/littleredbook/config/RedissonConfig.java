@@ -53,7 +53,7 @@ public class RedissonConfig {
     public RedissonClient redissonClient() {
         Config config = new Config();
         config.useSingleServer()
-                .setAddress("redis://192.168.23.137:6379")
+                .setAddress("redis://192.168.23.138:6379")
                 .setPassword("123456")
                 .setDatabase(5)
                 .setConnectionPoolSize(64)

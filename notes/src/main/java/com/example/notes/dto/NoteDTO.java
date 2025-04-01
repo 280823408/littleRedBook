@@ -37,14 +37,14 @@ public class NoteDTO {
     private String resource;
     /** 笔记正文内容 */
     private String content;
+    /** 点赞数 */
+    private Integer likeNum;
+    /** 收藏数 */
+    private Double collectionsNum;
     /** 更新时间 */
     private Timestamp updateTime;
     /** 创建时间 */
     private Timestamp createTime;
-    /** 点赞数 */
-    private Double likeNum;
-    /** 收藏数 */
-    private Double collectionsNum;
     /** 所属用户 */
     private User user;
     /** 标签 */

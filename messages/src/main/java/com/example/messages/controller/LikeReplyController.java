@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("likeReply")
+@RequestMapping("like-replies")
 public class LikeReplyController {
     @Resource
     private ILikeReplyService likeReplyService;
@@ -39,8 +39,8 @@ public class LikeReplyController {
      * @param id 点赞记录唯一标识
      * @return 包含点赞实体或错误信息的Result对象
      */
-    @GetMapping("getLikeReplyById")
-    public Result getLikeReplyById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getLikeReplyById(@PathVariable Integer id) {
         return likeReplyService.getLikeReplyById(id);
     }
 
@@ -50,8 +50,8 @@ public class LikeReplyController {
      * @param replyId 被点赞的回复ID
      * @return 包含点赞记录集合的Result对象
      */
-    @GetMapping("getLikeRepliesByReplyId")
-    public Result getLikeRepliesByReplyId(@RequestParam Integer replyId) {
+    @GetMapping("/replies/{replyId}")
+    public Result getLikeRepliesByReplyId(@PathVariable Integer replyId) {
         return likeReplyService.getLikeRepliesByReplyId(replyId);
     }
 
@@ -62,11 +62,22 @@ public class LikeReplyController {
      * @param userId  操作用户ID
      * @return 包含点赞状态信息的Result对象
      */
-    @GetMapping("getLikeReplyByReplyIdAndUserId")
+    @GetMapping("/replies/{replyId}/users/{userId}")
     public Result getLikeReplyByReplyIdAndUserId(
-            @RequestParam Integer replyId,
-            @RequestParam Integer userId) {
+            @PathVariable Integer replyId,
+            @PathVariable Integer userId) {
         return likeReplyService.getLikeReplyByReplyIdAndUserId(replyId, userId);
+    }
+
+    /**
+     * 获取点赞通知
+     *
+     * @param userId 操作用户ID
+     * @return 包含点赞通知信息的Result
+     */
+    @GetMapping("/notices/{userId}")
+    public Result getLikeNotice(@PathVariable Integer userId) {
+        return likeReplyService.getLikeNotice(userId);
     }
 
     /**
@@ -75,8 +86,8 @@ public class LikeReplyController {
      * @param id 点赞记录唯一标识
      * @return 操作结果的Result对象
      */
-    @GetMapping("removeLikeReply")
-    public Result removeLikeReply(@RequestParam Integer id) {
+    @DeleteMapping("/{id}")
+    public Result removeLikeReply(@PathVariable Integer id) {
         return likeReplyService.removeLikeReply(id);
     }
 
@@ -86,7 +97,7 @@ public class LikeReplyController {
      * @param likeReply 点赞记录数据传输对象（需包含replyId和userId）
      * @return 操作结果的Result对象
      */
-    @PostMapping("addLikeReply")
+    @PostMapping
     public Result addLikeReply(@RequestBody LikeReply likeReply) {
         return likeReplyService.addLikeReply(likeReply);
     }

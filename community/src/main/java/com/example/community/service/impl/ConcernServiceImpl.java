@@ -1,21 +1,32 @@
 package com.example.community.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.community.dto.ConcernNotice;
 import com.example.community.mapper.ConcernMapper;
 import com.example.community.service.IConcernService;
+import com.example.community.utils.UserCenterClient;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.Concern;
+import com.example.littleredbook.entity.LikeNote;
+import com.example.littleredbook.entity.User;
 import com.example.littleredbook.utils.HashRedisClient;
+import com.example.littleredbook.utils.MQClient;
 import com.example.littleredbook.utils.StringRedisClient;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
 
 /**
@@ -40,9 +51,11 @@ import static com.example.littleredbook.utils.RedisConstants.*;
 @Service
 public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> implements IConcernService {
     @Resource
-    private StringRedisClient stringRedisClient;
-    @Resource
     private HashRedisClient hashRedisClient;
+    @Resource
+    private MQClient mqClient;
+    @Resource
+    private UserCenterClient userCenterClient;
 
     /**
      * 根据关注记录ID查询详细信息
@@ -59,8 +72,7 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
             if (concern == null) {
                 return Result.fail("该关注记录ID不存在");
             }
-            hashRedisClient.hMultiSet(CACHE_CONCERN_KEY + id, Concern.class);
-            hashRedisClient.expire(CACHE_CONCERN_KEY + id, CACHE_CONCERN_TTL, TimeUnit.MINUTES);
+            mqClient.sendMessage(TOPIC_COMMUNITY_EXCHANGE, TOPIC_COMMUNITY_EXCHANGE_WITH_COMMUNITY_CONRERN_CACHE_ADD_QUEUE_ROUTING_KEY, concern);
             return Result.ok(concern);
         } catch (ParseException e) {
             return Result.fail("获取关注记录ID为" + id + "失败");
@@ -74,16 +86,10 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
      */
     @Override
     public Result getConcernByUserId(Integer userId) {
-        List<Concern> concernList = stringRedisClient.queryListWithMutex(
-                CACHE_CONCERN_USER_KEY,
-                userId,
-                Concern.class,
-                this::getConcernsFromDBForUserId,
-                CACHE_CONCERN_USER_TTL,
-                TimeUnit.MINUTES
-        );
+        List<Concern> concernList = list(query().getWrapper()
+                .eq("user_id", userId));
         if (concernList == null) {
-            return Result.fail("获取收藏记录列表失败");
+            return Result.ok(Collections.emptyList());
         }
         return Result.ok(concernList);
     }
@@ -99,6 +105,36 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
     }
 
     /**
+     * 根据用户ID和粉丝ID查询关注记录
+     * @param userId 被关注用户ID
+     * @param fansId 粉丝用户ID
+     * @return 包含关注记录的Result对象
+     */
+    @Override
+    public Result getConcernByUserIdAndFansId(Integer userId, Integer fansId) {
+        return Result.ok(baseMapper.selectOne(query().getWrapper().eq("user_id", userId)
+                .eq("fans_id", fansId)));
+    }
+
+    /**
+     * 获取用户关注通知
+     * @param userId 用户唯一标识
+     * @return 包含关注通知的Result对象
+     */
+    @Override
+    public Result getConcernNotice(Integer userId) {
+        List<Concern> concernList = list(query().getWrapper().eq("user_id", userId));
+        List<ConcernNotice> concernNoticeList = new ArrayList<>();
+        for (Concern concern : concernList) {
+            Object userData = userCenterClient.getUserById(concern.getFansId()).getData();
+            User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
+            ConcernNotice concernNotice = new ConcernNotice(user, concern.getLikeTime());
+            concernNoticeList.add(concernNotice);
+        }
+        return Result.ok(concernNoticeList);
+    }
+
+    /**
      * 根据ID删除关注记录
      * @param id 关注记录唯一标识
      * @return 操作结果的Result对象
@@ -109,7 +145,7 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
         if (!removeById(id)) {
             throw new RuntimeException("删除关注记录" + id + "失败");
         }
-        hashRedisClient.delete(CACHE_CONCERN_KEY + id);
+        mqClient.sendMessage(TOPIC_COMMUNITY_EXCHANGE, TOPIC_COMMUNITY_EXCHANGE_WITH_COMMUNITY_CONRERN_CACHE_DELETE_QUEUE_ROUTING_KEY, id);
         return Result.ok();
     }
 
@@ -128,7 +164,7 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
         if (!removeById(id)) {
             throw new RuntimeException("删除关注记录" + id + "失败");
         }
-        hashRedisClient.delete(CACHE_CONCERN_KEY + id);
+        mqClient.sendMessage(TOPIC_COMMUNITY_EXCHANGE, TOPIC_COMMUNITY_EXCHANGE_WITH_COMMUNITY_CONRERN_CACHE_DELETE_QUEUE_ROUTING_KEY, id);
         return Result.ok();
     }
 
@@ -143,7 +179,7 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
         if (!save(concern)) {
             throw new RuntimeException("添加新的关注记录失败");
         }
-        hashRedisClient.hMultiSet(CACHE_CONCERN_KEY + concern.getId(), concern);
+        mqClient.sendMessage(TOPIC_COMMUNITY_EXCHANGE, TOPIC_COMMUNITY_EXCHANGE_WITH_COMMUNITY_CONRERN_CACHE_ADD_QUEUE_ROUTING_KEY, concern);
         return Result.ok();
     }
 

@@ -42,4 +42,15 @@ public class UserCenterClientFallback implements UserCenterClient {
     public Result getUsersByIds(List<Integer> ids) {
         return Result.fail("用户服务不可用");
     }
+
+    /**
+     * 根据用户ID和笔记ID查询收藏记录降级处理
+     * @param userId 用户ID
+     * @param noteId 笔记ID
+     * @return 固定错误响应（服务不可用提示）
+     */
+    @Override
+    public Result getCollectionsByUserIdAndNoteId(Integer userId, Integer noteId) {
+        return Result.fail("用户服务不可用");
+    }
 }

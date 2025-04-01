@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.SearchRecord;
 import com.example.littleredbook.utils.HashRedisClient;
+import com.example.littleredbook.utils.MQClient;
 import com.example.littleredbook.utils.StringRedisClient;
 import com.example.search.mapper.SearchRecordMapper;
 import com.example.search.service.ISearchRecordService;
@@ -18,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
 /**
  * 搜索记录服务实现类
@@ -44,6 +46,8 @@ public class SearchRecordServiceImp extends ServiceImpl<SearchRecordMapper, Sear
     private StringRedisClient stringRedisClient;
     @Resource
     private HashRedisClient hashRedisClient;
+    @Resource
+    private MQClient mqClient;
 
     /**
      * 根据ID查询搜索记录详情
@@ -60,8 +64,7 @@ public class SearchRecordServiceImp extends ServiceImpl<SearchRecordMapper, Sear
             if (searchRecord == null) {
                 return Result.fail("该搜索记录ID不存在");
             }
-            hashRedisClient.hMultiSet(CACHE_SEARCH_KEY + id, SearchRecord.class);
-            hashRedisClient.expire(CACHE_SEARCH_KEY + id, CACHE_SEARCH_TTL, TimeUnit.MINUTES);
+            mqClient.sendMessage(TOPIC_SEARCH_EXCHANGE, TOPIC_SEARCH_EXCHANGE_WITH_SEARCH_SEARCHRECORD_CACHE_ADD_QUEUE_ROUTING_KEY, searchRecord);
             return Result.ok(searchRecord);
         } catch (ParseException e) {
             return Result.fail("获取搜索记录ID为" + id + "失败");
@@ -99,7 +102,7 @@ public class SearchRecordServiceImp extends ServiceImpl<SearchRecordMapper, Sear
     public Result removeSearchRecordsByUserId(Integer userId) {
         List<SearchRecord> searchRecords = this.getSearchRecordFromDBForUserId(userId);
         for (SearchRecord searchRecord: searchRecords) {
-            hashRedisClient.delete(CACHE_SEARCH_KEY + searchRecord.getId());
+            mqClient.sendMessage(TOPIC_SEARCH_EXCHANGE, TOPIC_SEARCH_EXCHANGE_WITH_SEARCH_SEARCHRECORD_CACHE_DELETE_QUEUE_ROUTING_KEY, searchRecord.getId());
             this.removeById(searchRecord.getId());
         }
         return Result.ok();
@@ -116,7 +119,7 @@ public class SearchRecordServiceImp extends ServiceImpl<SearchRecordMapper, Sear
         if (!this.removeById(id)) {
             throw new RuntimeException("删除浏览记录失败");
         }
-        hashRedisClient.delete(CACHE_SEARCH_KEY + id);
+        mqClient.sendMessage(TOPIC_SEARCH_EXCHANGE, TOPIC_SEARCH_EXCHANGE_WITH_SEARCH_SEARCHRECORD_CACHE_DELETE_QUEUE_ROUTING_KEY, id);
         return Result.ok();
     }
 
@@ -132,7 +135,7 @@ public class SearchRecordServiceImp extends ServiceImpl<SearchRecordMapper, Sear
         if (!this.save(searchRecord)) {
             throw new RuntimeException("添加新的搜索记录失败");
         }
-        hashRedisClient.hMultiSet(CACHE_SEARCH_KEY + searchRecord.getId(), searchRecord);
+        mqClient.sendMessage(TOPIC_SEARCH_EXCHANGE, TOPIC_SEARCH_EXCHANGE_WITH_SEARCH_SEARCHRECORD_CACHE_ADD_QUEUE_ROUTING_KEY, searchRecord);
         return Result.ok();
     }
 

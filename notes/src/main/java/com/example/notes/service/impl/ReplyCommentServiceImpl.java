@@ -5,12 +5,21 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.LikeReply;
+import com.example.littleredbook.entity.NoteComment;
 import com.example.littleredbook.entity.ReplyComment;
+import com.example.littleredbook.entity.User;
 import com.example.littleredbook.utils.HashRedisClient;
+import com.example.littleredbook.utils.MQClient;
 import com.example.littleredbook.utils.StringRedisClient;
+import com.example.notes.dto.LikeMessage;
+import com.example.notes.dto.NoteCommentDTO;
+import com.example.notes.dto.ReplyCommentDTO;
+import com.example.notes.dto.ReplyNotice;
 import com.example.notes.mapper.ReplyCommentMapper;
+import com.example.notes.service.INoteCommentService;
 import com.example.notes.service.IReplyCommentService;
 import com.example.notes.utils.MessagesClient;
+import com.example.notes.utils.UserCenterClient;
 import jakarta.annotation.Resource;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
@@ -18,10 +27,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
 
 /**
@@ -51,6 +62,12 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
     private HashRedisClient hashRedisClient;
     @Resource
     private MessagesClient messagesClient;
+    @Resource
+    private MQClient mqClient;
+    @Resource
+    private UserCenterClient userCenterClient;
+    @Resource
+    private INoteCommentService noteCommentService;
 
     /**
      * 根据ID查询回复评论详情
@@ -60,16 +77,17 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
     @Override
     public Result getReplyCommentById(Integer id) {
         try {
-            ReplyComment replyComment = hashRedisClient.hMultiGet(CACHE_REPLYCOMMENT_KEY + id, ReplyComment.class);
-            if (replyComment == null) {
-                replyComment = getById(id);
-                if (replyComment == null) {
-                    return Result.fail("回复评论不存在");
-                }
-                hashRedisClient.hMultiSet(CACHE_REPLYCOMMENT_KEY + id, replyComment);
-                hashRedisClient.expire(CACHE_REPLYCOMMENT_KEY + id, CACHE_COMMENT_TTL, TimeUnit.MINUTES);
+            ReplyCommentDTO replyCommentDTO = hashRedisClient.hMultiGet(CACHE_REPLYCOMMENT_KEY + id, ReplyCommentDTO.class);
+            if (replyCommentDTO != null) {
+                return Result.ok(replyCommentDTO);
             }
-            return Result.ok(replyComment);
+            ReplyComment replyComment = getById(id);
+            if (replyComment == null) {
+                return Result.fail("回复评论不存在");
+            }
+            replyCommentDTO = convertToDTO(replyComment);
+            mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_ADD_QUEUE_ROUTING_KEY, replyCommentDTO);
+            return Result.ok(replyCommentDTO);
         } catch (ParseException e) {
             return Result.fail("获取回复评论ID为" + id + "失败");
         }
@@ -82,18 +100,47 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
      */
     @Override
     public Result getReplyCommentsByCommentId(Integer commentId) {
-        List<ReplyComment> replyComments = stringRedisClient.queryListWithMutex(
-                CACHE_REPLYCOMMENT_COMMENT_KEY,
-                commentId,
-                ReplyComment.class,
-                this::getReplyCommentsByCommentIdFromDB,
-                CACHE_REPLYCOMMENT_COMMENT_TTL,
-                TimeUnit.MINUTES
-        );
-        if (replyComments == null) {
-            return Result.fail("获取回复评论列表失败");
+        List<Integer> ids = listObjs(query().getWrapper().eq("comment_id", commentId).select("id"));
+        List<ReplyCommentDTO> replyComments = new ArrayList<>();
+        for (Integer id : ids) {
+            Result result = this.getReplyCommentById(id);
+            if (result.getSuccess()) {
+                replyComments.add((ReplyCommentDTO) result.getData());
+            }
         }
         return Result.ok(replyComments);
+//        List<ReplyCommentDTO> replyComments = stringRedisClient.queryListWithMutex(
+//                CACHE_REPLYCOMMENT_COMMENT_KEY,
+//                commentId,
+//                ReplyCommentDTO.class,
+//                this::getReplyCommentsByCommentIdFromDB,
+//                CACHE_REPLYCOMMENT_COMMENT_TTL,
+//                TimeUnit.MINUTES
+//        );
+//        if (replyComments == null) {
+//            return Result.fail("获取回复评论列表失败");
+//        }
+//        return Result.ok(replyComments);
+    }
+
+    @Override
+    public Result getReplyCommentNotice(Integer userId) {
+        List<ReplyNotice> replyNotices = new ArrayList<>();
+        List<NoteCommentDTO> noteComments = (List<NoteCommentDTO>) noteCommentService.getNoteCommentsByUserId(userId).getData();
+        for (NoteCommentDTO noteComment : noteComments) {
+            List<ReplyCommentDTO> replyComments = (List<ReplyCommentDTO>) this.getReplyCommentsByCommentId(noteComment.getId()).getData();
+            for (ReplyCommentDTO replyComment : replyComments) {
+                Object userData = userCenterClient.getUserById(replyComment.getUser().getId()).getData();
+                User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
+                replyNotices.add(new ReplyNotice(
+                        replyComment,
+                        noteComment,
+                        user
+                ));
+            }
+        }
+        replyNotices.sort((o1, o2) -> o2.getReplyComment().getReplyTime().compareTo(o1.getReplyComment().getReplyTime()));
+        return Result.ok(replyNotices);
     }
 
     /**
@@ -107,8 +154,8 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         if (!this.save(replyComment)) {
             throw new RuntimeException("添加回复评论失败");
         }
-        hashRedisClient.hMultiSet(CACHE_REPLYCOMMENT_KEY + replyComment.getId(), replyComment);
-        hashRedisClient.expire(CACHE_REPLYCOMMENT_KEY + replyComment.getId(), CACHE_REPLYCOMMENT_TTL, TimeUnit.MINUTES);
+        ReplyCommentDTO replyCommentDTO = convertToDTO(replyComment);
+        mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_ADD_QUEUE_ROUTING_KEY, replyCommentDTO);
         return Result.ok();
     }
 
@@ -123,7 +170,7 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         if (!this.removeById(id)) {
             throw new RuntimeException("删除回复评论失败");
         }
-        hashRedisClient.delete(CACHE_COMMENT_KEY + id);
+        mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_DELETE_QUEUE_ROUTING_KEY, id);
         return Result.ok();
     }
 
@@ -142,16 +189,14 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         IReplyCommentService replyCommentService = (IReplyCommentService) AopContext.currentProxy();
         replyCommentService.updateReplyCommentLikeNum(id, isLike);
         if (isLike) {
-            messagesClient.removeLikeReply(likeReply.getId());
-            hashRedisClient.hIncrement(CACHE_REPLYCOMMENT_KEY + id, "likeNum", -1);
-            hashRedisClient.expire(CACHE_REPLYCOMMENT_KEY + id, CACHE_REPLYCOMMENT_TTL, TimeUnit.MINUTES);
+            mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_LIKE_QUEUE_ROUTING_KEY, likeReply);
+            mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_LIKE_QUEUE_ROUTING_KEY, new LikeMessage(id, -1), 100);
             return Result.ok();
         }
         likeReply.setReplyId(id);
         likeReply.setUserId(userId);
-        messagesClient.addLikeReply(likeReply);
-        hashRedisClient.hIncrement(CACHE_REPLYCOMMENT_KEY + id, "likeNum", 1);
-        hashRedisClient.expire(CACHE_REPLYCOMMENT_KEY + id, CACHE_REPLYCOMMENT_TTL, TimeUnit.MINUTES);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_LIKE_QUEUE_ROUTING_KEY, likeReply);
+        mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_LIKE_QUEUE_ROUTING_KEY, new LikeMessage(id, 1), 100);
         return Result.ok();
     }
 
@@ -178,13 +223,30 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
      * @param commentId 父评论唯一标识
      * @return 按时间倒序排列的回复集合
      */
-    private List<ReplyComment> getReplyCommentsByCommentIdFromDB(Integer commentId) {
+    private List<ReplyCommentDTO> getReplyCommentsByCommentIdFromDB(Integer commentId) {
         List<ReplyComment> replyCommentList = query().eq("comment_id", commentId)
                 .orderByDesc("reply_time")
                 .list();
+        List<ReplyCommentDTO> replyCommentDTOS = new ArrayList<>();
+        for (ReplyComment replyComment : replyCommentList) {
+            replyCommentDTOS.add(convertToDTO(replyComment));
+        }
         if (replyCommentList.isEmpty()) {
             return java.util.Collections.emptyList();
         }
-        return replyCommentList;
+        return replyCommentDTOS;
+    }
+
+
+    private ReplyCommentDTO convertToDTO(ReplyComment replyComment) {
+        ReplyCommentDTO replyCommentDTO = BeanUtil.copyProperties(replyComment, ReplyCommentDTO.class);
+        Integer userId = replyComment.getUserId();
+        Object userData = userCenterClient.getUserById(userId).getData();
+        User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
+        if (user == null) {
+            log.error("用户服务调用失败: ReplycommentId={" + replyComment.getId() + "}, userId={" + userId + "}");
+        }
+        replyCommentDTO.setUser(user);
+        return replyCommentDTO;
     }
 }

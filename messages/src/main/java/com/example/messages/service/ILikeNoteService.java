@@ -40,12 +40,26 @@ public interface ILikeNoteService extends IService<LikeNote> {
     Result getLikeNotesByNoteId(Integer noteId);
 
     /**
+     * 根据用户ID获取用户点赞过的笔记
+     * @param userId 目标用户ID
+     * @return 包含点赞过的笔记集合的Result对象
+     */
+    Result getLikesNotesByUserId(Integer userId);
+
+    /**
      * 查询用户对笔记的点赞状态
      * @param noteId 目标笔记ID
      * @param userId 操作用户ID
      * @return 包含特定点赞记录的Result对象（存在即表示已点赞）
      */
     Result getLikeNoteByNoteIdAndUserId(Integer noteId, Integer userId);
+
+    /**
+     * 获取用户点赞通知
+     * @param userId 操作用户ID
+     * @return 包含点赞通知集合的Result对象
+     */
+    Result getLikeNotice(Integer userId);
 
     /**
      * 根据ID移除点赞记录

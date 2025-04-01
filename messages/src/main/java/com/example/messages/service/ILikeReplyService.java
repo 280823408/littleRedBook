@@ -48,6 +48,13 @@ public interface ILikeReplyService extends IService<LikeReply> {
     Result getLikeReplyByReplyIdAndUserId(Integer replyId, Integer userId);
 
     /**
+     * 获取用户点赞通知
+     * @param userId 操作用户ID
+     * @return 包含点赞通知的Result对象
+     */
+    Result getLikeNotice(Integer userId);
+
+    /**
      * 根据ID移除点赞记录
      * @param id 点赞记录唯一标识
      * @return 包含删除操作结果的Result对象

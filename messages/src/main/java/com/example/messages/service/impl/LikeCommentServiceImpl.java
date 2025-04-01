@@ -1,23 +1,34 @@
 package com.example.messages.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.littleredbook.dto.NoteCommentDTO;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.LikeComment;
+import com.example.littleredbook.entity.NoteComment;
+import com.example.littleredbook.entity.User;
 import com.example.littleredbook.utils.HashRedisClient;
-import com.example.littleredbook.utils.StringRedisClient;
+import com.example.littleredbook.utils.MQClient;
+import com.example.messages.dto.LikeCommentNotice;
 import com.example.messages.mapper.LikeCommentMapper;
 import com.example.messages.service.ILikeCommentService;
+import com.example.messages.utils.NotesClient;
+import com.example.messages.utils.UserCenterClient;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
 
 /**
@@ -29,6 +40,7 @@ import static com.example.littleredbook.utils.RedisConstants.*;
  * 3. 使用Redis Hash结构缓存点赞记录<br>
  * 4. 设计复合键二级索引优化联合查询<br>
  * 5. 事务注解保障数据操作原子性<br>
+ * 6. 消息队列异步处理点赞记录缓存更新<br>
  *
  * <p>关键特性：
  * - 主记录缓存与二级索引同步维护<br>
@@ -42,9 +54,13 @@ import static com.example.littleredbook.utils.RedisConstants.*;
 @Service
 public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeComment> implements ILikeCommentService {
     @Resource
-    private StringRedisClient stringRedisClient;
-    @Resource
     private HashRedisClient hashRedisClient;
+    @Resource
+    private MQClient mqClient;
+    @Resource
+    private UserCenterClient userCenterClient;
+    @Resource
+    private NotesClient notesClient;
 
     /**
      * 根据主键查询点赞记录
@@ -55,14 +71,16 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
     public Result getLikeCommentById(Integer id) {
         try {
             LikeComment likeComment = hashRedisClient.hMultiGet(CACHE_LIKECOMMENT_KEY + id, LikeComment.class);
-            if (likeComment == null) {
-                likeComment = getById(id);
+            if (likeComment != null) {
+                return Result.ok(likeComment);
             }
+            likeComment = getById(id);
             if (likeComment == null) {
                 return Result.fail("该点赞评论记录ID不存在");
             }
-            hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_KEY + id, likeComment);
-            hashRedisClient.expire(CACHE_LIKECOMMENT_KEY + id, CACHE_LIKECOMMENT_TTL, TimeUnit.MINUTES);
+            hashRedisClient.hSet(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId()
+                    ,"id", likeComment.getId(), CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
+            mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKECOMMENT_CACHE_ADD_QUEUE_ROUTING_KEY, likeComment);
             return Result.ok(likeComment);
         } catch (ParseException e) {
             return Result.fail("获取点赞评论记录ID为" + id + "失败");
@@ -76,16 +94,15 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
      */
     @Override
     public Result getLikeCommentsByCommentId(Integer commentId) {
-        List<LikeComment> likeCommentList = stringRedisClient.queryListWithMutex(
-                CACHE_LIKECOMMENT_COMMENT_KEY,
-                commentId,
-                LikeComment.class,
-                this::getLikeCommentsFromDBForCommentId,
-                CACHE_LIKECOMMENT_COMMENT_TTL,
-                TimeUnit.MINUTES
-        );
-        if (likeCommentList == null) {
-            return Result.fail("获取点赞记录列表失败");
+        List<Integer> likeCommentListIds = listObjs(query().getWrapper()
+                .eq("comment_id", commentId)
+                .select("id"));
+        List<LikeComment> likeCommentList = new ArrayList<>();
+        for(Integer id : likeCommentListIds) {
+            Result result = this.getLikeCommentById(id);
+            if (result.getSuccess()) {
+                likeCommentList.add((LikeComment) result.getData());
+            }
         }
         return Result.ok(likeCommentList);
     }
@@ -124,6 +141,26 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
     }
 
     /**
+     * 获取用户点赞记录
+     * @param userId 用户ID
+     * @return 包含点赞记录的Result对象
+     */
+    @Override
+    public Result getLikeNotice(Integer userId) {
+        List<LikeComment> likeNoteList = list(query().getWrapper().eq("user_id", userId));
+        List<LikeCommentNotice> noticeList = new ArrayList<>();
+        for (LikeComment likeComment : likeNoteList) {
+            Object userData = userCenterClient.getUserById(likeComment.getUserId()).getData();
+            User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
+            Object noteCommentData = notesClient.getNoteCommentById(likeComment.getCommentId()).getData();
+            NoteCommentDTO noteComment = BeanUtil.mapToBean((Map<?, ?>) noteCommentData, NoteCommentDTO.class, true);
+            noticeList.add(new LikeCommentNotice(noteComment, user, likeComment.getLikeTime()));
+        }
+        noticeList.sort(((o1, o2) -> o2.getLikeTime().compareTo(o1.getLikeTime())));
+        return Result.ok(noticeList);
+    }
+
+    /**
      * 删除点赞记录
      * @param id 点赞记录主键
      * @return 操作结果
@@ -135,7 +172,7 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
         if (!this.removeById(id)) {
             throw new RuntimeException("删除点赞评论记录" + id + "失败");
         }
-        hashRedisClient.delete(CACHE_LIKECOMMENT_KEY + id);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKECOMMENT_CACHE_DELETE_QUEUE_ROUTING_KEY, id);
         hashRedisClient.delete(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId());
         return Result.ok();
     }
@@ -152,8 +189,7 @@ public class LikeCommentServiceImpl extends ServiceImpl<LikeCommentMapper, LikeC
         if (!this.save(likeComment)) {
             throw new RuntimeException("添加新的点赞评论记录失败");
         }
-        hashRedisClient.hMultiSet(CACHE_LIKECOMMENT_KEY + likeComment.getId(), likeComment);
-        hashRedisClient.expire(CACHE_LIKECOMMENT_KEY + likeComment.getId(), CACHE_LIKECOMMENT_TTL, TimeUnit.MINUTES);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKECOMMENT_CACHE_ADD_QUEUE_ROUTING_KEY, likeComment);
         hashRedisClient.hSet(CACHE_LIKECOMMENT_COMMENT_USER_KEY + likeComment.getCommentId() + ":" + likeComment.getUserId()
                 ,"id", likeComment.getId(), CACHE_LIKECOMMENT_COMMENT_USER_TTL, TimeUnit.MINUTES);
         return Result.ok();

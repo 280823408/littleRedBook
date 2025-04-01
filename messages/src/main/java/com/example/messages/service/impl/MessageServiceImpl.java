@@ -1,12 +1,17 @@
 package com.example.messages.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.Message;
+import com.example.littleredbook.entity.User;
 import com.example.littleredbook.utils.HashRedisClient;
+import com.example.littleredbook.utils.MQClient;
 import com.example.littleredbook.utils.StringRedisClient;
+import com.example.messages.dto.MessageNotice;
 import com.example.messages.mapper.MessageMapper;
 import com.example.messages.service.IMessageService;
+import com.example.messages.utils.UserCenterClient;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.time.ZoneId;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
 
 /**
@@ -45,6 +50,10 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
     private StringRedisClient stringRedisClient;
     @Resource
     private HashRedisClient hashRedisClient;
+    @Resource
+    private MQClient mqClient;
+    @Resource
+    private UserCenterClient userCenterClient;
 
     /**
      * 根据ID查询私信详情
@@ -60,13 +69,28 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
                 if (message == null) {
                     return Result.fail("私信记录不存在");
                 }
-                hashRedisClient.hMultiSet(CACHE_MESSAGE_KEY + id, message);
-                hashRedisClient.expire(CACHE_MESSAGE_KEY + id, CACHE_MESSAGE_TTL, TimeUnit.MINUTES);
+                mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_MESSAGE_CACHE_ADD_QUEUE_ROUTING_KEY, message);
             }
             return Result.ok(message);
         } catch (ParseException e) {
             return Result.fail("获取私信记录ID为" + id + "失败");
         }
+    }
+
+    /**
+     * 获取会话消息列表（双向查询）
+     * @param receiverId 接收方ID
+     * @return 按发送时间倒序排列的私信集合
+     */
+    @Override
+    public Result getMessagesByReceiverIdWithNoRead(Integer receiverId) {
+        List<Message> messageList = list(query().getWrapper()
+                .eq("receiver_id", receiverId)
+                .eq("is_read", 0));
+        if (messageList.isEmpty()) {
+            return Result.ok(Collections.emptyList());
+        }
+        return Result.ok(messageList);
     }
 
     /**
@@ -77,18 +101,47 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
      */
     @Override
     public Result getMessagesBySenderIdAndReceiverIdOrderBySendTime(Integer sendId, Integer receiverId) {
-        List<Message> messages = stringRedisClient.queryListWithMutex(
-                CACHE_MESSAGE_SENDERANDRECEIVER_KEY + "%s:%s",
-                Message.class,
-                this::getMessagesFromDB,
-                CACHE_MESSAGE_SENDERANDRECEIVER_TTL,
-                TimeUnit.MINUTES,
-                sendId, receiverId
-        );
-        if (messages == null) {
-            return Result.fail("获取私信列表失败");
+        List<Integer> messagesIds = listObjs(query().getWrapper().eq("sender_id", sendId).eq("receiver_id", receiverId).select("id"));
+        List<Message> messageList = new ArrayList<>();
+        for (Integer id : messagesIds) {
+            Result result = this.getMessageById(id);
+            if (result.getSuccess()) {
+                messageList.add((Message) result.getData());
+            }
         }
-        return Result.ok(messages);
+        return Result.ok(messageList);
+//        List<Message> messages = stringRedisClient.queryListWithMutex(
+//                CACHE_MESSAGE_SENDERANDRECEIVER_KEY + "%s:%s",
+//                Message.class,
+//                this::getMessagesFromDB,
+//                CACHE_MESSAGE_SENDERANDRECEIVER_TTL,
+//                TimeUnit.MINUTES,
+//                sendId, receiverId
+//        );
+//        if (messages == null) {
+//            return Result.fail("获取私信列表失败");
+//        }
+//        return Result.ok(messages);
+    }
+
+    /**
+     * 获取会话消息列表（双向查询）
+     * @param userId 用户ID
+     * @return 按发送时间倒序排列的私信集合
+     */
+    @Override
+    public Result getMessagesNotices(Integer userId) {
+        List<Message> messages = list(query().getWrapper()
+                .eq("receiver_id", userId)
+                .eq("is_read", 0));
+        List<MessageNotice> messageNotices = new ArrayList<>();
+        for (Message message : messages) {
+            Object sender = userCenterClient.getUserById(message.getSenderId()).getData();
+            User user = BeanUtil.mapToBean((Map<?,?>) sender, User.class, true);
+            messageNotices.add(new MessageNotice(user, message, message.getSendTime()));
+        }
+        messageNotices.sort(((o1, o2) -> o2.getSendTime().compareTo(o1.getSendTime())));
+        return Result.ok(messageNotices);
     }
 
     /**
@@ -105,7 +158,7 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         if (!removeById(message.getId())) {
             throw new RuntimeException("删除私信" + message.getId() + "失败");
         }
-        hashRedisClient.delete(CACHE_MESSAGE_KEY + message.getId());
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_MESSAGE_CACHE_DELETE_QUEUE_ROUTING_KEY, message.getId());
         return Result.ok();
     }
 
@@ -120,7 +173,7 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         if (!this.removeById(id)) {
             throw new RuntimeException("删除私信" + id + "失败");
         }
-        hashRedisClient.delete(CACHE_MESSAGE_KEY + id);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_MESSAGE_CACHE_DELETE_QUEUE_ROUTING_KEY, id);
         return Result.ok();
     }
 
@@ -171,8 +224,7 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         if (!this.save(message)) {
             throw new RuntimeException("添加私信失败");
         }
-        hashRedisClient.hMultiSet(CACHE_MESSAGE_KEY + message.getId(), message);
-        hashRedisClient.expire(CACHE_MESSAGE_KEY + message.getId(), CACHE_MESSAGE_TTL, TimeUnit.MINUTES);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_MESSAGE_CACHE_ADD_QUEUE_ROUTING_KEY, message);
         return Result.ok();
     }
 

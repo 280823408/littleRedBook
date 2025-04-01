@@ -1,13 +1,19 @@
 package com.example.messages.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.littleredbook.dto.NoteDTO;
 import com.example.littleredbook.dto.Result;
-import com.example.littleredbook.entity.LikeNote;
+import com.example.littleredbook.entity.*;
 import com.example.littleredbook.utils.HashRedisClient;
+import com.example.littleredbook.utils.MQClient;
 import com.example.littleredbook.utils.StringRedisClient;
+import com.example.messages.dto.LikeNoteNotice;
 import com.example.messages.mapper.LikeNoteMapper;
 import com.example.messages.service.ILikeNoteService;
+import com.example.messages.utils.NotesClient;
+import com.example.messages.utils.UserCenterClient;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -15,9 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.text.ParseException;
-import java.util.List;
+import java.util.*;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
+import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
 /**
  * 笔记点赞服务实现类
@@ -41,9 +50,13 @@ import static com.example.littleredbook.utils.RedisConstants.*;
 @Service
 public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> implements ILikeNoteService {
     @Resource
-    private StringRedisClient stringRedisClient;
-    @Resource
     private HashRedisClient hashRedisClient;
+    @Resource
+    private MQClient mqClient;
+    @Resource
+    private UserCenterClient userCenterClient;
+    @Resource
+    private NotesClient notesClient;
 
     /**
      * 根据主键查询点赞记录
@@ -54,14 +67,16 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
     public Result getLikeNoteById(Integer id) {
         try {
             LikeNote likeNote = hashRedisClient.hMultiGet(CACHE_LIKENOTE_KEY + id, LikeNote.class);
-            if (likeNote == null) {
-                likeNote = getById(id);
-                if (likeNote == null) {
-                    return Result.fail("点赞笔记记录不存在");
-                }
-                hashRedisClient.hMultiSet(CACHE_LIKENOTE_KEY + id, likeNote);
-                hashRedisClient.expire(CACHE_LIKENOTE_KEY + id, CACHE_LIKENOTE_TTL, TimeUnit.MINUTES);
+            if (likeNote != null) {
+                return Result.ok(likeNote);
             }
+            likeNote = getById(id);
+            if (likeNote == null) {
+                return Result.fail("点赞笔记记录不存在");
+            }
+            hashRedisClient.hSet(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + ":" + likeNote.getUserId()
+                    ,"id", likeNote.getId(), CACHE_LIKENOTE_NOTE_USER_TTL, TimeUnit.MINUTES);
+            mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKENOTE_CACHE_ADD_QUEUE_ROUTING_KEY, likeNote);
             return Result.ok(likeNote);
         } catch (ParseException e) {
             return Result.fail("获取点赞笔记记录ID为" + id + "失败");
@@ -75,19 +90,32 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
      */
     @Override
     public Result getLikeNotesByNoteId(Integer noteId) {
-        List<LikeNote> likeNoteList = stringRedisClient.queryListWithMutex(
-                CACHE_LIKENOTE_NOTE_KEY,
-                noteId,
-                LikeNote.class,
-                this::getLikeNotesFromDBForNoteId,
-                CACHE_LIKENOTE_NOTE_TTL,
-                TimeUnit.MINUTES
-        );
-        if (likeNoteList == null) {
-            return Result.fail("获取点赞笔记记录列表失败");
+        List<Integer> likeNoteListIds = listObjs(query().getWrapper().eq("note_id", noteId).select("id"));
+        List<LikeNote> likeNoteList = new ArrayList<>();
+        for(Integer id : likeNoteListIds) {
+            Result result = this.getLikeNoteById(id);
+            if (result.getSuccess()) {
+                likeNoteList.add((LikeNote) result.getData());
+            }
         }
         return Result.ok(likeNoteList);
     }
+
+    /**
+     * 获取用户所有点赞记录
+     * @param userId 目标用户ID
+     * @return 包含点赞集合的Result对象
+     */
+    @Override
+    public Result getLikesNotesByUserId(Integer userId) {
+        List<LikeNote> likeNoteList = list(query().getWrapper().eq("user_id", userId));
+        Set<Integer> noteIdList = new HashSet<>();
+        for (LikeNote likeNote : likeNoteList) {
+            noteIdList.add(likeNote.getNoteId());
+        }
+        return Result.ok(new ArrayList<>(noteIdList));
+    }
+
 
     /**
      * 联合查询用户对笔记的点赞状态
@@ -123,6 +151,32 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
     }
 
     /**
+     * 获取点赞通知
+     * @param userId 目标用户ID
+     * @return 包含点赞通知的Result对象
+     */
+    @Override
+    public Result getLikeNotice(Integer userId) {
+        List<LikeNote> likeNoteList = list(query().getWrapper().eq("user_id", userId));
+        List<LikeNoteNotice> noticeList = new ArrayList<>();
+        for (LikeNote likeNote : likeNoteList) {
+            Object userData = userCenterClient.getUserById(likeNote.getUserId()).getData();
+            User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
+            Object noteCommentData = null;
+            try {
+                noteCommentData = notesClient.getNoteById(likeNote.getNoteId()).getData();
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+            NoteDTO note = BeanUtil.mapToBean((Map<?, ?>) noteCommentData, NoteDTO.class, true);
+            noticeList.add(new LikeNoteNotice(note, user, likeNote.getLikeTime()));
+        }
+        noticeList.sort(((o1, o2) -> o2.getLikeTime().compareTo(o1.getLikeTime())));
+        return Result.ok(noticeList);
+    }
+
+
+    /**
      * 删除点赞记录
      * @param id 点赞记录主键
      * @return 操作结果
@@ -134,7 +188,7 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
         if (!this.removeById(id)) {
             throw new RuntimeException("删除点赞笔记记录" + id + "失败");
         }
-        hashRedisClient.delete(CACHE_LIKENOTE_KEY + id);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKENOTE_CACHE_DELETE_QUEUE_ROUTING_KEY, likeNote.getId());
         hashRedisClient.delete(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + ":" + likeNote.getUserId());
         return Result.ok();
     }
@@ -151,8 +205,7 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
         if (!this.save(likeNote)) {
             throw new RuntimeException("添加新的点赞笔记记录失败");
         }
-        hashRedisClient.hMultiSet(CACHE_LIKENOTE_KEY + likeNote.getId(), likeNote);
-        hashRedisClient.expire(CACHE_LIKENOTE_KEY + likeNote.getId(), CACHE_LIKENOTE_TTL, TimeUnit.MINUTES);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKENOTE_CACHE_ADD_QUEUE_ROUTING_KEY, likeNote);
         hashRedisClient.hSet(CACHE_LIKENOTE_NOTE_USER_KEY + likeNote.getNoteId() + ":" + likeNote.getUserId()
                 ,"id", likeNote.getId(), CACHE_LIKENOTE_NOTE_USER_TTL, TimeUnit.MINUTES);
         return Result.ok();

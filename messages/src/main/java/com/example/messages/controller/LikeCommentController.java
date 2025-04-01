@@ -28,18 +28,19 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("likeComment")
+@RequestMapping("like-comments")
 public class LikeCommentController {
     @Resource
     private ILikeCommentService likeCommentService;
+
     /**
      * 根据主键ID获取点赞记录详情
      *
      * @param id 点赞记录唯一标识
      * @return 包含点赞实体或错误信息的Result对象
      */
-    @GetMapping("getLikeCommentById")
-    public Result getLikeCommentById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getLikeCommentById(@PathVariable Integer id) {
         return likeCommentService.getLikeCommentById(id);
     }
 
@@ -49,8 +50,8 @@ public class LikeCommentController {
      * @param commentId 被点赞的评论ID
      * @return 包含点赞记录集合的Result对象
      */
-    @GetMapping("getLikeCommentsByCommentId")
-    public Result getLikeCommentsByCommentId(@RequestParam Integer commentId) {
+    @GetMapping("/comments/{commentId}")
+    public Result getLikeCommentsByCommentId(@PathVariable Integer commentId) {
         return likeCommentService.getLikeCommentsByCommentId(commentId);
     }
 
@@ -61,11 +62,22 @@ public class LikeCommentController {
      * @param userId    操作用户ID
      * @return 包含点赞状态信息的Result对象
      */
-    @GetMapping("getLikeCommentByCommentIdAndUserId")
+    @GetMapping("/comments/{commentId}/users/{userId}")
     public Result getLikeCommentByCommentIdAndUserId(
-            @RequestParam Integer commentId,
-            @RequestParam Integer userId) {
+            @PathVariable Integer commentId,
+            @PathVariable Integer userId) {
         return likeCommentService.getLikeCommentByCommentIdAndUserId(commentId, userId);
+    }
+
+    /**
+     * 获取点赞通知
+     *
+     * @param userId 用户ID
+     * @return 包含点赞通知的Result对象
+     */
+    @GetMapping("/notices/{userId}")
+    public Result getLikeNotice(@PathVariable Integer userId) {
+        return likeCommentService.getLikeNotice(userId);
     }
 
     /**
@@ -74,8 +86,8 @@ public class LikeCommentController {
      * @param id 点赞记录唯一标识
      * @return 操作结果的Result对象
      */
-    @GetMapping("removeLikeComment")
-    public Result removeLikeComment(@RequestParam Integer id) {
+    @DeleteMapping("/{id}")
+    public Result removeLikeComment(@PathVariable Integer id) {
         return likeCommentService.removeLikeComment(id);
     }
 
@@ -85,7 +97,7 @@ public class LikeCommentController {
      * @param likeComment 点赞记录数据传输对象（需包含commentId和userId）
      * @return 操作结果的Result对象
      */
-    @PostMapping("addLikeComment")
+    @PostMapping
     public Result addLikeComment(@RequestBody LikeComment likeComment) {
         return likeCommentService.addLikeComment(likeComment);
     }

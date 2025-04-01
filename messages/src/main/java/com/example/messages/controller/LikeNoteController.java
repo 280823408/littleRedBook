@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @CrossOrigin
 @RestController
-@RequestMapping("likeNote")
+@RequestMapping("like-notes")
 public class LikeNoteController {
     @Resource
     private ILikeNoteService likeNoteService;
@@ -39,8 +39,8 @@ public class LikeNoteController {
      * @param id 点赞记录唯一标识
      * @return 包含点赞实体或错误信息的Result对象
      */
-    @GetMapping("getLikeNoteById")
-    public Result getLikeNoteById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getLikeNoteById(@PathVariable Integer id) {
         return likeNoteService.getLikeNoteById(id);
     }
 
@@ -50,9 +50,20 @@ public class LikeNoteController {
      * @param noteId 被点赞的笔记ID
      * @return 包含点赞记录集合的Result对象
      */
-    @GetMapping("getLikeNotesByNoteId")
-    public Result getLikeNotesByNoteId(@RequestParam Integer noteId) {
+    @GetMapping("/notes/{noteId}")
+    public Result getLikeNotesByNoteId(@PathVariable Integer noteId) {
         return likeNoteService.getLikeNotesByNoteId(noteId);
+    }
+
+    /**
+     * 获取指定用户的所有点赞记录
+     *
+     * @param userId 操作用户ID
+     * @return 包含点赞记录集合的Result对象
+     */
+    @GetMapping("/users/{userId}")
+    public Result getLikesNotesByUserId(@PathVariable Integer userId) {
+        return likeNoteService.getLikesNotesByUserId(userId);
     }
 
     /**
@@ -62,11 +73,16 @@ public class LikeNoteController {
      * @param userId 操作用户ID
      * @return 包含点赞状态信息的Result对象
      */
-    @GetMapping("getLikeNoteByNoteIdAndUserId")
+    @GetMapping("/notes/{noteId}/users/{userId}")
     public Result getLikeNoteByNoteIdAndUserId(
-            @RequestParam Integer noteId,
-            @RequestParam Integer userId) {
+            @PathVariable Integer noteId,
+            @PathVariable Integer userId) {
         return likeNoteService.getLikeNoteByNoteIdAndUserId(noteId, userId);
+    }
+
+    @GetMapping("/notices/{userId}")
+    public Result getLikeNotice(@PathVariable Integer userId) {
+        return likeNoteService.getLikeNotice(userId);
     }
 
     /**
@@ -75,8 +91,8 @@ public class LikeNoteController {
      * @param id 点赞记录唯一标识
      * @return 操作结果的Result对象
      */
-    @GetMapping("removeLikeNote")
-    public Result removeLikeNote(@RequestParam Integer id) {
+    @DeleteMapping("/{id}")
+    public Result removeLikeNote(@PathVariable Integer id) {
         return likeNoteService.removeLikeNote(id);
     }
 
@@ -86,9 +102,8 @@ public class LikeNoteController {
      * @param likeNote 点赞记录数据传输对象（需包含noteId和userId）
      * @return 操作结果的Result对象
      */
-    @PostMapping("addLikeNote")
+    @PostMapping
     public Result addLikeNote(@RequestBody LikeNote likeNote) {
         return likeNoteService.addLikeNote(likeNote);
     }
 }
-

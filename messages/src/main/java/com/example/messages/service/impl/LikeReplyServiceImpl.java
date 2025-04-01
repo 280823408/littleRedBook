@@ -1,14 +1,20 @@
 package com.example.messages.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.littleredbook.dto.ReplyCommentDTO;
 import com.example.littleredbook.dto.Result;
-import com.example.littleredbook.entity.LikeNote;
 import com.example.littleredbook.entity.LikeReply;
+import com.example.littleredbook.entity.ReplyComment;
+import com.example.littleredbook.entity.User;
 import com.example.littleredbook.utils.HashRedisClient;
-import com.example.littleredbook.utils.StringRedisClient;
+import com.example.littleredbook.utils.MQClient;
+import com.example.messages.dto.LikeReplyNotice;
 import com.example.messages.mapper.LikeReplyMapper;
 import com.example.messages.service.ILikeReplyService;
+import com.example.messages.utils.NotesClient;
+import com.example.messages.utils.UserCenterClient;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -16,9 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
 /**
  * 回复点赞服务实现类
@@ -42,9 +51,13 @@ import static com.example.littleredbook.utils.RedisConstants.*;
 @Service
 public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply> implements ILikeReplyService {
     @Resource
-    private StringRedisClient stringRedisClient;
-    @Resource
     private HashRedisClient hashRedisClient;
+    @Resource
+    private MQClient mqClient;
+    @Resource
+    private UserCenterClient userCenterClient;
+    @Resource
+    private NotesClient notesClient;
 
     /**
      * 根据主键查询点赞记录
@@ -60,8 +73,9 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
                 if (likeReply == null) {
                     return Result.fail("点赞回复记录不存在");
                 }
-                hashRedisClient.hMultiSet(CACHE_LIKEREPLY_KEY + id, likeReply);
-                hashRedisClient.expire(CACHE_LIKEREPLY_KEY + id, CACHE_LIKEREPLY_TTL, TimeUnit.MINUTES);
+                hashRedisClient.hSet(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId()
+                        ,"id", likeReply.getId(), CACHE_LIKEREPLY_REPLY_USER_TTL, TimeUnit.MINUTES);
+                mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_CACHE_ADD_QUEUE_ROUTING_KEY, likeReply);
             }
             return Result.ok(likeReply);
         } catch (ParseException e) {
@@ -76,16 +90,13 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
      */
     @Override
     public Result getLikeRepliesByReplyId(Integer replyId) {
-        List<LikeReply> likeReplyList = stringRedisClient.queryListWithMutex(
-                CACHE_LIKEREPLY_REPLY_KEY,
-                replyId,
-                LikeReply.class,
-                this::getLikeRepliesFromDBForReplyId,
-                CACHE_LIKEREPLY_REPLY_TTL,
-                TimeUnit.MINUTES
-        );
-        if (likeReplyList == null) {
-            return Result.fail("获取点赞回复记录列表失败");
+        List<Integer> likeReplyListIds = listObjs(query().getWrapper().eq("reply_id", replyId).select("id"));
+        List<LikeReply> likeReplyList = new ArrayList<>();
+        for(Integer id : likeReplyListIds) {
+            Result result = this.getLikeReplyById(id);
+            if (result.getSuccess()) {
+                likeReplyList.add((LikeReply) result.getData());
+            }
         }
         return Result.ok(likeReplyList);
     }
@@ -124,6 +135,26 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
     }
 
     /**
+     * 获取点赞通知
+     * @param userId 用户ID
+     * @return 包含点赞通知的Result对象
+     */
+    @Override
+    public Result getLikeNotice(Integer userId) {
+        List<LikeReply> likeNoteList = list(query().getWrapper().eq("user_id", userId));
+        List<LikeReplyNotice> noticeList = new ArrayList<>();
+        for (LikeReply likeReply : likeNoteList) {
+            Object userData = userCenterClient.getUserById(likeReply.getUserId()).getData();
+            User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
+            Object replyData = notesClient.getReplyCommentById(likeReply.getReplyId()).getData();
+            ReplyCommentDTO reply = BeanUtil.mapToBean((Map<?, ?>) replyData, ReplyCommentDTO.class, true);
+            noticeList.add(new LikeReplyNotice(reply, user, likeReply.getLikeTime()));
+        }
+        noticeList.sort(((o1, o2) -> o2.getLikeTime().compareTo(o1.getLikeTime())));
+        return Result.ok(noticeList);
+    }
+
+    /**
      * 删除点赞记录
      * @param id 点赞记录主键
      * @return 操作结果
@@ -135,7 +166,7 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
         if (!this.removeById(id)) {
             throw new RuntimeException("删除点赞回复记录" + id + "失败");
         }
-        hashRedisClient.delete(CACHE_LIKEREPLY_KEY + id);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_CACHE_DELETE_QUEUE_ROUTING_KEY, id);
         hashRedisClient.delete(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId());
         return Result.ok();
     }
@@ -152,8 +183,7 @@ public class LikeReplyServiceImpl extends ServiceImpl<LikeReplyMapper, LikeReply
         if (!this.save(likeReply)) {
             throw new RuntimeException("添加新的点赞回复记录失败");
         }
-        hashRedisClient.hMultiSet(CACHE_LIKEREPLY_KEY + likeReply.getId(), likeReply);
-        hashRedisClient.expire(CACHE_LIKEREPLY_KEY + likeReply.getId(), CACHE_LIKEREPLY_TTL, TimeUnit.MINUTES);
+        mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_CACHE_ADD_QUEUE_ROUTING_KEY, likeReply);
         hashRedisClient.hSet(CACHE_LIKEREPLY_REPLY_USER_KEY + likeReply.getReplyId() + ":" + likeReply.getUserId()
                 ,"id", likeReply.getId(), CACHE_LIKEREPLY_REPLY_USER_TTL, TimeUnit.MINUTES);
         return Result.ok();

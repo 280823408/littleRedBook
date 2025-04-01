@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartException;
@@ -39,10 +38,10 @@ import java.util.Objects;
  */
 @Slf4j
 @CrossOrigin
-@Controller
-@RequestMapping("fileUpload")
+@RestController
+@RequestMapping("files")
 public class FileUploadController {
-    @Value("")
+    @Value("${file.upload.dir}")
     private String uploadDir;
 
     /**
@@ -59,8 +58,7 @@ public class FileUploadController {
      * @return 包含文件访问路径的响应实体（HTTP 200）或错误描述（4xx/5xx）
      * @apiNote 支持最大文件大小受Spring配置限制，默认超出限制返回413状态码
      */
-    @PostMapping("upload")
-    @ResponseBody
+    @PostMapping
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
         try {
             String fileName = System.currentTimeMillis() + "_"

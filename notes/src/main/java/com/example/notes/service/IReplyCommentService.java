@@ -41,6 +41,13 @@ public interface IReplyCommentService extends IService<ReplyComment> {
     Result getReplyCommentsByCommentId(Integer commentId);
 
     /**
+     * 获取回复评论通知
+     * @param userId 操作用户ID
+     * @return 包含回复评论通知的Result对象
+     */
+    Result getReplyCommentNotice(Integer userId);
+
+    /**
      * 新增回复评论记录
      * @param replyComment 包含回复内容的实体对象
      * @return 包含新增回复ID的Result对象

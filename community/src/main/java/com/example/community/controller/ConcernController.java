@@ -38,8 +38,8 @@ public class ConcernController {
      * @param id 关注记录唯一标识
      * @return 包含关注实体或错误信息的Result对象
      */
-    @GetMapping("getConcernById")
-    public Result getConcernById(@RequestParam Integer id) {
+    @GetMapping("/{id}")
+    public Result getConcernById(@PathVariable Integer id) {
         return concernService.getConcernById(id);
     }
 
@@ -48,8 +48,8 @@ public class ConcernController {
      * @param userId 用户唯一标识
      * @return 包含关注关系集合的Result对象
      */
-    @GetMapping("getConcernByUserId")
-    public Result getConcernByUserId(@RequestParam Integer userId) {
+    @GetMapping("/user/{userId}")
+    public Result getConcernByUserId(@PathVariable Integer userId) {
         return concernService.getConcernByUserId(userId);
     }
 
@@ -58,9 +58,32 @@ public class ConcernController {
      * @param userId 用户唯一标识
      * @return 包含关注数量的Result对象
      */
-    @GetMapping("getConcernNumByUserId")
-    public Result getConcernNumByUserId(@RequestParam Integer userId) {
+    @GetMapping("/user/{userId}/count")
+    public Result getConcernNumByUserId(@PathVariable Integer userId) {
         return concernService.getConcernNumByUserId(userId);
+    }
+
+    /**
+     * 获取指定用户与粉丝的关注关系
+     * @param userId 用户唯一标识
+     * @param fansId 粉丝用户唯一标识
+     * @return 包含关注关系实体的Result对象
+     */
+    @GetMapping("/user/{userId}/fans/{fansId}")
+    public Result getConcernByUserIdAndFansId(
+            @PathVariable Integer userId,
+            @PathVariable Integer fansId) {
+        return concernService.getConcernByUserIdAndFansId(userId, fansId);
+    }
+
+    /**
+     * 获取用户关注通知
+     * @param userId 用户唯一标识
+     * @return 包含关注通知的Result对象
+     */
+    @GetMapping("/notices/{userId}")
+    public Result getConcernNotice(@PathVariable Integer userId) {
+        return concernService.getConcernNotice(userId);
     }
 
     /**
@@ -68,8 +91,8 @@ public class ConcernController {
      * @param id 关注记录唯一标识
      * @return 操作结果的Result对象
      */
-    @GetMapping("removeConcernById")
-    public Result removeConcernById(@RequestParam Integer id) {
+    @DeleteMapping("/{id}")
+    public Result removeConcernById(@PathVariable Integer id) {
         return concernService.removeConcernById(id);
     }
 
@@ -79,10 +102,10 @@ public class ConcernController {
      * @param fansId 粉丝用户ID
      * @return 操作结果的Result对象
      */
-    @GetMapping("removeConcernByUserIdAndFansId")
+    @DeleteMapping("/user/{userId}/fans/{fansId}")
     public Result removeConcernByUserIdAndFansId(
-            @RequestParam Integer userId,
-            @RequestParam Integer fansId) {
+            @PathVariable Integer userId,
+            @PathVariable Integer fansId) {
         return concernService.removeConcernByUserIdAndFansId(userId, fansId);
     }
 
@@ -91,7 +114,7 @@ public class ConcernController {
      * @param concern 待新增的关注关系数据传输对象
      * @return 操作结果的Result对象
      */
-    @PostMapping("addConcern")
+    @PostMapping
     public Result addConcern(@RequestBody Concern concern) {
         return concernService.addConcern(concern);
     }
