@@ -312,11 +312,10 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     @Override
     @Transactional
     public Result addNote(Note note) {
-        if (!this.updateById(note)) {
+        if (!this.save(note)) {
             throw new RuntimeException("添加新笔记失败");
         }
-        hashRedisClient.delete(CACHE_NOTE_KEY + note.getId());
-        return Result.ok();
+        return Result.ok(note.getId());
     }
 
     /**
@@ -331,7 +330,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
         if (id == null) {
             return Result.fail("笔记ID不能为空!");
         }
-        if (!this.save(note)) {
+        if (!this.updateById(note)) {
             throw new RuntimeException("修改笔记失败");
         }
         hashRedisClient.delete(CACHE_NOTE_KEY + id);
@@ -373,20 +372,20 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     @Override
     public Result collectNote(Integer id, Integer userId) {
         Object collectionData =  userCenterClient.getCollectionsByUserIdAndNoteId(
-                id, userId).getData();
+                userId, id).getData();
         Collections collections = BeanUtil.mapToBean((Map<?, ?>) collectionData, Collections.class, true);
         boolean isCollection = collections.getId() != null;
         INoteService noteService = (INoteService) AopContext.currentProxy();
         noteService.updateNoteCollectionNum(id, isCollection);
         if (isCollection) {
             mqClient.sendMessage(TOPIC_USER_EXCHANGE, TOPIC_USER_EXCHANGE_WITH_USERCENTER_COLLECTIONS_CACHE_LIKE_QUEUE_ROUTING_KEY, collections);
-            mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_COLLECTION_QUEUE_ROUTING_KEY, new LikeMessage(id, -1), 100);
+            mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_COLLECTION_QUEUE_ROUTING_KEY, new LikeMessage(id, -1));
             return Result.ok();
         }
         collections.setNoteId(id);
         collections.setUserId(userId);
         mqClient.sendMessage(TOPIC_USER_EXCHANGE, TOPIC_USER_EXCHANGE_WITH_USERCENTER_COLLECTIONS_CACHE_LIKE_QUEUE_ROUTING_KEY, collections);
-        mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_COLLECTION_QUEUE_ROUTING_KEY, new LikeMessage(id, 1), 100);
+        mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_COLLECTION_QUEUE_ROUTING_KEY, new LikeMessage(id, 1));
         return Result.ok();
     }
 
@@ -417,7 +416,7 @@ public class NoteServiceImpl extends ServiceImpl<NoteMapper, Note> implements IN
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Result updateNoteCollectionNum(Integer id, boolean isCollection) {
-        String sql = isCollection ? "collections_num = like_num - 1" : "collections = collections + 1";
+        String sql = isCollection ? "collections_num = collections_num - 1" : "collections_num = collections_num + 1";
         if (!update(new LambdaUpdateWrapper<Note>()
                 .eq(Note::getId, id)
                 .setSql(sql))) {

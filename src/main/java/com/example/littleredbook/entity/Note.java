@@ -27,7 +27,7 @@ public class Note {
     private Integer type;
     /** 公开状态：0-私密，1-公开 */
     @TableField("is_public")
-    private Boolean isPublic;
+    private Integer isPublic;
     /** 资源路径（图片/视频URL） */
     private String resource;
     /** 笔记正文内容 */

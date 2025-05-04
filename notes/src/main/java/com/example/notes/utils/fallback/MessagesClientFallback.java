@@ -68,6 +68,11 @@ public class MessagesClientFallback implements MessagesClient {
         return Result.fail("消息服务不可用");
     }
 
+    @Override
+    public Result getLikeNoteRecordsByUserId(Integer userId) {
+        return Result.fail("消息服务不可用");
+    }
+
     /**
      * 笔记点赞移除降级处理
      * @param id 点赞记录唯一标识

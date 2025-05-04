@@ -18,6 +18,7 @@
         <module>community</module>
         <module>messages</module>
         <module>search</module>
+        <module>gateway</module>
     </modules>
     <name>LittleRedBook</name>
     <description>LittleRedBook</description>

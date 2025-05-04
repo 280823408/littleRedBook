@@ -14,10 +14,10 @@ import org.springframework.context.annotation.Configuration;
 //@AllArgsConstructor
 public class MqConfig {
 //    private final RabbitTemplate rabbitTemplate;
-    @Bean
-    public MessageConverter jackson2JsonMessageConverter() {
-        return new Jackson2JsonMessageConverter();
-    }
+//    @Bean
+//    public MessageConverter jackson2JsonMessageConverter() {
+//        return new Jackson2JsonMessageConverter();
+//    }
 //    @PostConstruct
 //    public void init() {
 //        rabbitTemplate.setReturnsCallback(returnedMessage -> {

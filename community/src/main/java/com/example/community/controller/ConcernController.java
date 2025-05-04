@@ -87,6 +87,17 @@ public class ConcernController {
     }
 
     /**
+     * 获取用户好友列表
+     * @param userId 用户唯一标识
+     * @return 包含好友列表的Result对象
+     */
+    @GetMapping("/user/{userId}/friends")
+    public Result getFriends(@PathVariable Integer userId) {
+        return concernService.getFriends(userId);
+    }
+
+
+    /**
      * 通过ID移除关注关系
      * @param id 关注记录唯一标识
      * @return 操作结果的Result对象

@@ -40,6 +40,7 @@ public interface MessagesClient {
      */
     @PostMapping("/like-comments")
     Result addLikeComment(@RequestBody LikeComment likeComment);
+
     /**
      * 根据评论ID和用户ID查询点赞记录
      * @param commentId 评论唯一标识
@@ -69,6 +70,14 @@ public interface MessagesClient {
     Result getLikeNoteByNoteIdAndUserId(
             @PathVariable Integer noteId,
             @PathVariable Integer userId);
+
+    /**
+     * 查询笔记点赞记录
+     * @param userId 用户唯一标识
+     * @return Result标准响应（包含LikeNote或错误信息）
+     */
+    @GetMapping("/like-notes/records/{userId}")
+    public Result getLikeNoteRecordsByUserId(@PathVariable Integer userId);
 
     /**
      * 移除笔记点赞记录

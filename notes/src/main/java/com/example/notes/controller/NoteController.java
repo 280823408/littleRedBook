@@ -3,6 +3,7 @@ package com.example.notes.controller;
 import com.example.littleredbook.dto.Result;
 import com.example.littleredbook.entity.Note;
 import com.example.notes.service.INoteService;
+import com.example.notes.service.impl.CFRecommendNotesImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -36,6 +37,13 @@ import java.util.List;
 public class NoteController {
     @Resource
     private INoteService noteService;
+    @Resource
+    private CFRecommendNotesImpl cfRecommendNotes;
+
+    @GetMapping("/recommend/{userId}")
+    public Result recommendNotes(@PathVariable Integer userId) {
+        return cfRecommendNotes.recommendNotes(userId);
+    }
 
     /**
      * 根据笔记ID获取笔记详情

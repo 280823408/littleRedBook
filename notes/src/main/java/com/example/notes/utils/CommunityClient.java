@@ -41,4 +41,7 @@ public interface CommunityClient {
      */
     @GetMapping("/tags/{tagId}/notes")
     Result getNoteIdByTagId(@PathVariable Integer tagId);
+
+    @GetMapping("/concern/user/{userId}/friends")
+    Result getFriends(@PathVariable Integer userId);
 }

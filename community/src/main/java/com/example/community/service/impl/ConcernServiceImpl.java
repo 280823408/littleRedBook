@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.example.littleredbook.utils.MQConstants.*;
 import static com.example.littleredbook.utils.RedisConstants.*;
@@ -115,6 +116,36 @@ public class ConcernServiceImpl extends ServiceImpl<ConcernMapper, Concern> impl
         return Result.ok(baseMapper.selectOne(query().getWrapper().eq("user_id", userId)
                 .eq("fans_id", fansId)));
     }
+
+    @Override
+    public Result getFriends(Integer userId) {
+        List<Concern> followingList = list(query().getWrapper().eq("user_id", userId));
+        List<Concern> followerList = list(query().getWrapper().eq("fans_id", userId));
+
+        if (followingList == null || followingList.isEmpty() || followerList == null || followerList.isEmpty()) {
+            return Result.ok(Collections.emptyList());
+        }
+
+        List<Integer> followingIds = followingList.stream()
+                .map(Concern::getFansId)
+                .collect(Collectors.toList());
+        List<Integer> followerIds = followerList.stream()
+                .map(Concern::getUserId)
+                .collect(Collectors.toList());
+        List<Integer> friendIds = followingIds.stream()
+                .filter(followerIds::contains)
+                .collect(Collectors.toList());
+
+        List<User> friends = new ArrayList<>();
+        for (Integer friendId : friendIds) {
+            Object userData = userCenterClient.getUserById(friendId).getData();
+            User user = BeanUtil.mapToBean((Map<?, ?>) userData, User.class, true);
+            friends.add(user);
+        }
+
+        return Result.ok(friends);
+    }
+
 
     /**
      * 获取用户关注通知

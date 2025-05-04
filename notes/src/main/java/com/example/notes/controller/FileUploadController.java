@@ -59,13 +59,15 @@ public class FileUploadController {
      * @apiNote 支持最大文件大小受Spring配置限制，默认超出限制返回413状态码
      */
     @PostMapping
-    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file, @RequestParam("type") String type) {
         try {
-            String fileName = System.currentTimeMillis() + "_"
-                    + UUID.randomUUID() + "_"
-                    + StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
-            String fileType = Objects.requireNonNull(file.getContentType()).split("/")[0];
-            String subDir = fileType.equals("image") ? "images" : "videos";
+            String fileName = StringUtils.cleanPath(Objects.requireNonNull(file.getOriginalFilename()));
+            String subDir;
+            switch (type) {
+                case ("0") : subDir = "images"; break;
+                case ("1") : subDir = "videos"; break;
+                default: subDir = "others";
+            }
             Path storagePath = Paths.get(uploadDir, subDir, fileName);
             Files.createDirectories(storagePath.getParent());
             Files.copy(file.getInputStream(), storagePath);

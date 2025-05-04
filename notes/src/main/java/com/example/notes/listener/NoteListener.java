@@ -38,7 +38,7 @@ public class NoteListener {
             key = {TOPIC_NOTES_EXCHANGE_WITH_NOTES_NOTE_CACHE_COLLECTION_QUEUE_ROUTING_KEY}
     ))
     public void listenCollectionNoteCacheLike(LikeMessage likeMessage) {
-        hashRedisClient.hIncrement(CACHE_NOTE_KEY + likeMessage.getId(), "collections_num", likeMessage.getDelta());
+        hashRedisClient.hIncrement(CACHE_NOTE_KEY + likeMessage.getId(), "collectionsNum", likeMessage.getDelta());
         hashRedisClient.expire(CACHE_NOTE_KEY + likeMessage.getId(), CACHE_NOTE_TTL, TimeUnit.MINUTES);
     }
 }

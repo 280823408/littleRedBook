@@ -56,6 +56,13 @@ public interface IConcernService extends IService<Concern> {
     Result getConcernByUserIdAndFansId(Integer userId, Integer fansId);
 
     /**
+     * 获取好友列表
+     * @param userId 用户ID
+     * @return 包含好友列表的Result对象
+     */
+    Result getFriends(Integer userId);
+
+    /**
      * 获取关注通知
      * @param userId 用户ID
      * @return 包含关注通知的Result对象

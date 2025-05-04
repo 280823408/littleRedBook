@@ -67,6 +67,17 @@ public class LikeNoteController {
     }
 
     /**
+     * 获取点赞记录的记录
+     *
+     * @param userId 操作用户ID
+     * @return 包含点赞记录集合的Result对象
+     */
+    @GetMapping("/records/{userId}")
+    public Result getLikeNoteRecordsByUserId(@PathVariable Integer userId) {
+        return likeNoteService.getLikeNoteRecordsByUserId(userId);
+    }
+
+    /**
      * 查询用户对指定笔记的点赞状态
      *
      * @param noteId 目标笔记ID

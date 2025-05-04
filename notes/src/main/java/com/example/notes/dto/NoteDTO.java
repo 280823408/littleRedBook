@@ -40,7 +40,7 @@ public class NoteDTO {
     /** 点赞数 */
     private Integer likeNum;
     /** 收藏数 */
-    private Double collectionsNum;
+    private Integer collectionsNum;
     /** 更新时间 */
     private Timestamp updateTime;
     /** 创建时间 */

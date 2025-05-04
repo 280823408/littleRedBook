@@ -116,6 +116,19 @@ public class LikeNoteServiceImpl extends ServiceImpl<LikeNoteMapper, LikeNote> i
         return Result.ok(new ArrayList<>(noteIdList));
     }
 
+    @Override
+    public Result getLikeNoteRecordsByUserId(Integer userId) {
+        List<Integer> likeNoteListIds = listObjs(query().getWrapper().eq("user_id", userId).select("id"));
+        List<LikeNote> likeNoteList = new ArrayList<>();
+        for (Integer id : likeNoteListIds) {
+            Result result = this.getLikeNoteById(id);
+            if (result.getSuccess()) {
+                likeNoteList.add((LikeNote) result.getData());
+            }
+        }
+        return Result.ok(likeNoteList);
+    }
+
 
     /**
      * 联合查询用户对笔记的点赞状态

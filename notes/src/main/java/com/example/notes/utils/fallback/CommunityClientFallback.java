@@ -40,4 +40,9 @@ public class CommunityClientFallback implements CommunityClient {
     public Result getNoteIdByTagId(Integer tagId) {
         return Result.fail("标签服务不可用");
     }
+
+    @Override
+    public Result getFriends(Integer userId) {
+        return Result.fail("标签服务不可用");
+    }
 }
