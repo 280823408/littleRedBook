@@ -25,7 +25,7 @@ public class LikeNoteListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_LIKENOTE_LIKE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKENOTE_LIKE_QUEUE_ROUTING_KEY}
     ))
     public void listenLikeNote(LikeNote likeNote) {
@@ -38,7 +38,7 @@ public class LikeNoteListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_LIKENOTE_CACHE_ADD_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKENOTE_CACHE_ADD_QUEUE_ROUTING_KEY}
     ))
     public void listenLikeNoteCacheAdd(LikeNote likeNote) {

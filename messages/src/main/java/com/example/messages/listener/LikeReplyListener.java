@@ -25,7 +25,7 @@ public class LikeReplyListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_LIKEREPLY_LIKE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_LIKE_QUEUE_ROUTING_KEY}
     ))
     public void listenLikeNote(LikeReply likeReply) {
@@ -38,7 +38,7 @@ public class LikeReplyListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_LIKEREPLY_CACHE_ADD_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_CACHE_ADD_QUEUE_ROUTING_KEY}
     ))
     public void listenLikeNoteCacheAdd(LikeReply likeReply) {
@@ -49,7 +49,7 @@ public class LikeReplyListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_LIKEREPLY_CACHE_DELETE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_CACHE_DELETE_QUEUE_ROUTING_KEY}
    ))
     public void listenLikeNoteCacheDelete(Integer id) {

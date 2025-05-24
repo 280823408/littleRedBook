@@ -27,7 +27,7 @@ public class ReplyCommentListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = NOTES_REPLY_CACHE_LIKE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_NOTES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_NOTES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_LIKE_QUEUE_ROUTING_KEY}
     ))
     public void listenLikeReplyCacheLike(LikeMessage likeMessage) {

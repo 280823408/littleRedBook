@@ -190,13 +190,13 @@ public class ReplyCommentServiceImpl extends ServiceImpl<ReplyCommentMapper, Rep
         replyCommentService.updateReplyCommentLikeNum(id, isLike);
         if (isLike) {
             mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_LIKE_QUEUE_ROUTING_KEY, likeReply);
-            mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_LIKE_QUEUE_ROUTING_KEY, new LikeMessage(id, -1), 100);
+            mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_LIKE_QUEUE_ROUTING_KEY, new LikeMessage(id, -1));
             return Result.ok();
         }
         likeReply.setReplyId(id);
         likeReply.setUserId(userId);
         mqClient.sendMessage(TOPIC_MESSAGES_EXCHANGE, TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKEREPLY_LIKE_QUEUE_ROUTING_KEY, likeReply);
-        mqClient.sendDelayMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_LIKE_QUEUE_ROUTING_KEY, new LikeMessage(id, 1), 100);
+        mqClient.sendMessage(TOPIC_NOTES_EXCHANGE, TOPIC_NOTES_EXCHANGE_WITH_NOTES_REPLY_CACHE_LIKE_QUEUE_ROUTING_KEY, new LikeMessage(id, 1));
         return Result.ok();
     }
 

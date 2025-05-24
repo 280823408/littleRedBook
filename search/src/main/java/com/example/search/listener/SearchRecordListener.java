@@ -25,7 +25,7 @@ public class SearchRecordListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = SEARCH_SEARCHRECORD_CACHE_ADD_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_SEARCH_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_SEARCH_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_SEARCH_EXCHANGE_WITH_SEARCH_SEARCHRECORD_CACHE_ADD_QUEUE_ROUTING_KEY}
     ))
     public void listenSearchRecordCacheAdd(SearchRecord searchRecord) {
@@ -36,7 +36,7 @@ public class SearchRecordListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = SEARCH_SEARCHRECORD_CACHE_DELETE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_SEARCH_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_SEARCH_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_SEARCH_EXCHANGE_WITH_SEARCH_SEARCHRECORD_CACHE_DELETE_QUEUE_ROUTING_KEY}
     ))
     public void listenSearchRecordCacheDelete(Integer id) {

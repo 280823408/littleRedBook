@@ -25,7 +25,7 @@ public class MessagesListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_MESSAGE_CACHE_ADD_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_MESSAGE_CACHE_ADD_QUEUE_ROUTING_KEY}
     ))
     public void listenMessageCacheAdd(Message message) {
@@ -36,7 +36,7 @@ public class MessagesListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_MESSAGE_CACHE_DELETE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_MESSAGE_CACHE_DELETE_QUEUE_ROUTING_KEY}
     ))
     public void listenMessageCacheDelete(Integer id) {

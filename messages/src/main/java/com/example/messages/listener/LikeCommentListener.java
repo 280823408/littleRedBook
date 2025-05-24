@@ -25,7 +25,7 @@ public class LikeCommentListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_LIKECOMMENT_LIKE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKECOMMENT_LIKE_QUEUE_ROUTING_KEY}
     ))
     public void listenLikeComment(LikeComment likeComment) {
@@ -38,7 +38,7 @@ public class LikeCommentListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = MESSAGES_LIKECOMMENT_CACHE_ADD_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_MESSAGES_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_MESSAGES_EXCHANGE_WITH_MESSAGES_LIKECOMMENT_CACHE_ADD_QUEUE_ROUTING_KEY}
     ))
     public void listenLikeCommentCacheAdd(LikeComment likeComment) {

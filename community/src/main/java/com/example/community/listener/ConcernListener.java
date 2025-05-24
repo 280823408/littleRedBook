@@ -24,7 +24,7 @@ public class ConcernListener {
     private final HashRedisClient hashRedisClient;
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = COMMUNITY_CONCERN_LIKE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_COMMUNITY_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_COMMUNITY_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_COMMUNITY_EXCHANGE_WITH_COMMUNITY_CONCERN_LIKE_QUEUE_ROUTING_KEY}
     ))
     public void listenLikeUser(Concern concern) {
@@ -37,7 +37,7 @@ public class ConcernListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = COMMUNITY_CONRERN_CACHE_ADD_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_COMMUNITY_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_COMMUNITY_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_COMMUNITY_EXCHANGE_WITH_COMMUNITY_CONRERN_CACHE_ADD_QUEUE_ROUTING_KEY}
     ))
     public void listenConcernCacheAdd(Concern concern) {
@@ -48,7 +48,7 @@ public class ConcernListener {
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = COMMUNITY_CONRERN_CACHE_DELETE_QUEUE, durable = "true"),
-            exchange = @Exchange(name = TOPIC_COMMUNITY_EXCHANGE, type = ExchangeTypes.TOPIC, delayed = "true"),
+            exchange = @Exchange(name = TOPIC_COMMUNITY_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = {TOPIC_COMMUNITY_EXCHANGE_WITH_COMMUNITY_CONRERN_CACHE_DELETE_QUEUE_ROUTING_KEY}
     ))
     public void listenConcernCacheDelete(Integer id) {
